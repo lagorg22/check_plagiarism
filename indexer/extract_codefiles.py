@@ -45,7 +45,7 @@ def flatten_all_repositories(parent_dir, extensions, target_dir):
     used_names = set()
     
     # List of repository directories to process
-    repo_dirs = ['cs108', 'cs106b-stanford', 'bio', 'copart_myauto', 'free-python-games', 'projects-React']
+    repo_dirs = ['cs108', 'cs106b-stanford', 'bio', 'copart_myauto', 'free-python-games', 'projects-React', 'e-commerce']
     
     # Process each repository
     for repo_name in repo_dirs:
