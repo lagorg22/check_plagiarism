@@ -15,6 +15,7 @@ from typing import List, Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 
+
 with open("key.json", "r") as f:
     key_data = json.load(f)
     API_KEY = key_data["api_key"]
@@ -46,8 +47,7 @@ class LLMConfig:
     def __init__(self):
         self.api_key = API_KEY
         self.api_url = "https://api.deepseek.com/v1/chat/completions"
-        self.model = "deepseek-coder" 
-        
+        self.model = "deepseek-coder"  # Default model
 
 # Get LLM config as a dependency
 def get_llm_config():
@@ -85,6 +85,8 @@ For the purpose of this analysis, consider plagiarism as code that appears to be
 Reply with ONLY "Yes" if the code shows clear signs of plagiarism from any reference file, or "No" if it appears to be original.
 
 Your response:"""
+    
+    return prompt
 
 # Call the DeepSeek API
 async def call_deepseek(prompt: str, config: LLMConfig) -> str:
