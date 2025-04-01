@@ -2,23 +2,21 @@
 FastAPI service for code similarity search.
 This service:
 1. Receives code from user as text
-2. Cleans the code (removes comments, empty lines, imports)
-3. Generates embeddings for the code
+2. Calls the code processor API to clean the code (removes comments, empty lines, imports)
+3. Calls the embedding API to generate embeddings for the processed code
 4. Searches for the 3 most similar files using FAISS
 5. Returns the filepaths of these similar files
 """
 
 import os
-import re
 import json
 import numpy as np
-import torch
+import requests
 import faiss
 from pathlib import Path
 from typing import List, Dict
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModel
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -28,9 +26,10 @@ app = FastAPI(
 )
 
 # Constants
-MODEL_NAME = "Snowflake/snowflake-arctic-embed-m"
 EMBEDDING_DIM = 768
 TOP_K = 3  # Number of similar files to return
+EMBEDDING_API_URL = "http://localhost:8003/embed"  # URL of the embedding API
+CODE_PROCESSOR_API_URL = "http://localhost:8004/process"  # URL of the code processor API
 
 # Path setup
 def get_root_dir():
@@ -61,44 +60,11 @@ class SimilarFilesResponse(BaseModel):
     similar_files: List[SimilarFile]
     processed_code: str
 
-# Code cleaning function (copied from process_codefiles.py)
-def remove_comments_and_empty_lines(content):
-    """Remove comments, empty lines, and import statements from code."""
-    # Remove single line comments (# and //)
-    content = re.sub(r'^\s*#.*$', '', content, flags=re.MULTILINE)
-    content = re.sub(r'^\s*//.*$', '', content, flags=re.MULTILINE)
-    
-    # Remove C-style multi-line comments (/* */)
-    content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
-    
-    # Remove Python triple single-quote docstrings
-    content = re.sub(r"'''.*?'''", '', content, flags=re.DOTALL)
-    
-    # Remove Python triple double-quote docstrings
-    content = re.sub(r'""".*?"""', '', content, flags=re.DOTALL)
-    
-    # Split into lines
-    lines = content.split('\n')
-    
-    # Remove empty lines and import statements
-    non_empty_lines = []
-    for line in lines:
-        line = line.strip()
-        if line and not line.startswith('import') and not line.startswith('from'):
-            non_empty_lines.append(line)
-            
-    return '\n'.join(non_empty_lines)
-
 # Load the model and tokenizer
 @app.on_event("startup")
-async def startup_load_model():
-    """Load the model, tokenizer, and FAISS index on startup."""
-    global model, tokenizer, index, file_paths, embeddings
-    
-    print("Loading model and tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModel.from_pretrained(MODEL_NAME)
-    model.eval()
+async def startup_load_index():
+    """Load the FAISS index and file paths on startup."""
+    global index, file_paths, embeddings
     
     print("Loading FAISS index and file paths...")
     if not FAISS_INDEX.exists() or not FILE_PATHS_JSON.exists() or not EMBEDDINGS_NPY.exists():
@@ -118,30 +84,60 @@ async def startup_load_model():
     index = faiss.read_index(str(FAISS_INDEX))
     
     print(f"Successfully loaded {len(file_paths)} file paths and FAISS index with {index.ntotal} vectors")
+    
+    # Check if embedding API is available
+    try:
+        response = requests.get("http://localhost:8003/health")
+        if response.status_code == 200 and response.json().get("status") == "healthy":
+            print("Successfully connected to embedding API")
+        else:
+            print("WARNING: Embedding API may not be available!")
+    except Exception as e:
+        print(f"WARNING: Could not connect to embedding API: {str(e)}")
 
-# Generate embedding for code
-def generate_embedding(code: str):
-    """Generate embedding for a single code snippet."""
-    # Tokenize
-    inputs = tokenizer(
-        code,
-        padding=True,
-        truncation=True,
-        max_length=512,
-        return_tensors="pt"
-    )
-    
-    # Generate embedding
-    with torch.no_grad():
-        outputs = model(**inputs)
-        # Use mean pooling
-        attention_mask = inputs["attention_mask"]
-        token_embeddings = outputs.last_hidden_state
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        embedding = torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        embedding = embedding.cpu().numpy()
-    
-    return embedding.astype('float32')
+# Process code by calling the code processor API
+async def process_code(code: str):
+    """Process code by removing comments, imports, and empty lines using the code processor API."""
+    try:
+        response = requests.post(
+            CODE_PROCESSOR_API_URL,
+            json={"code": code},
+            headers={"Content-Type": "application/json"},
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            print(f"Error from code processor API: {response.text}")
+            raise Exception(f"Code processor API returned status code {response.status_code}")
+        
+        processing_result = response.json()
+        processed_code = processing_result["processed_code"]
+        return processed_code
+    except Exception as e:
+        print(f"Error calling code processor API: {str(e)}")
+        raise Exception(f"Failed to process code: {str(e)}")
+
+# Generate embedding for code by calling the embedding API
+async def generate_embedding(code: str):
+    """Generate embedding for a single code snippet using the embedding API."""
+    try:
+        response = requests.post(
+            EMBEDDING_API_URL,
+            json={"code": code},  # Changed from data=code to json={"code": code}
+            headers={"Content-Type": "application/json"},  # Changed content type
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            print(f"Error from embedding API: {response.text}")
+            raise Exception(f"Embedding API returned status code {response.status_code}")
+        
+        embedding_data = response.json()
+        embedding = np.array(embedding_data["embedding"], dtype="float32")
+        return embedding
+    except Exception as e:
+        print(f"Error calling embedding API: {str(e)}")
+        raise Exception(f"Failed to generate embedding: {str(e)}")
 
 # Find similar files
 def find_similar_files(embedding: np.ndarray, top_k: int = TOP_K):
@@ -176,15 +172,15 @@ async def search_similar_code(request: CodeRequest):
     """
     Search for similar code files based on the provided code snippet.
     
-    The code is processed to remove comments, empty lines, and import statements,
-    and then converted to an embedding. This embedding is used to search for
-    similar files in the FAISS index.
+    The code is processed by the code processor API to remove comments, empty lines, and import statements,
+    and then converted to an embedding via the embedding API. This embedding is 
+    used to search for similar files in the FAISS index.
     
     Returns the top 3 most similar files.
     """
     try:
-        # Process code (remove comments, empty lines, imports)
-        processed_code = remove_comments_and_empty_lines(request.code)
+        # Process code using the code processor API
+        processed_code = await process_code(request.code)
         
         if not processed_code.strip():
             raise HTTPException(
@@ -192,8 +188,8 @@ async def search_similar_code(request: CodeRequest):
                 detail="After processing, the code is empty. Please provide valid code."
             )
         
-        # Generate embedding
-        embedding = generate_embedding(processed_code)
+        # Generate embedding using the embedding API
+        embedding = await generate_embedding(processed_code)
         
         # Search for similar files
         similar_files = find_similar_files(embedding)
@@ -205,6 +201,19 @@ async def search_similar_code(request: CodeRequest):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+# Check service dependencies on startup
+@app.on_event("startup")
+async def check_dependencies():
+    """Check if the code processor API is available at startup."""
+    try:
+        response = requests.get("http://localhost:8004/health")
+        if response.status_code == 200 and response.json().get("status") == "healthy":
+            print("Successfully connected to code processor API")
+        else:
+            print("WARNING: Code processor API may not be available!")
+    except Exception as e:
+        print(f"WARNING: Could not connect to code processor API: {str(e)}")
 
 # Basic health check endpoint
 @app.get("/health")
