@@ -89,6 +89,17 @@ services:
       timeout: 10s
       retries: 3
 
+  evaluation:
+    build: ./evaluation
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./evaluation:/app/evaluation
+    networks:
+      - plagiarism_network
+    depends_on:
+      - orchestrator
+
 volumes:
   shared:
     driver: local
