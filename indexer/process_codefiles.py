@@ -5,12 +5,12 @@ from pathlib import Path
 from tqdm import tqdm
 
 # Code processor API URL
-CODE_PROCESSOR_API_URL = "http://localhost:8004/process_batch"
+CODE_PROCESSOR_API_URL = "http://code_processor:8004/process_batch"
 
 def check_code_processor_api():
     """Check if the code processor API is available."""
     try:
-        response = requests.get("http://localhost:8004/health")
+        response = requests.get("http://code_processor:8004/health")
         if response.status_code == 200 and response.json().get("status") == "healthy":
             print("Successfully connected to code processor API")
             return True
@@ -45,21 +45,18 @@ def process_files_batch(files_dict):
         return {}
 
 def process_files():
-    # Define paths
-    # Get the root directory (check_plagiarism)
-    current_file = Path(__file__)
-    root_dir = current_file.parent.parent  # Go up from indexer to check_plagiarism
-    
-    input_dir = root_dir / 'shared' / 'codefiles'
-    output_dir = root_dir / 'shared' / 'processed_codefiles'
+    # Define paths - in Docker, the shared directory is mounted at /app/shared
+    input_dir = Path("/app/shared/codefiles")
+    output_dir = Path("/app/shared/processed_codefiles")
     
     print(f"Input directory: {input_dir}")
     print(f"Output directory: {output_dir}")
     
     # Create shared directory if it doesn't exist
-    (root_dir / 'shared').mkdir(exist_ok=True)
+    input_dir.parent.mkdir(exist_ok=True)
     
-    # Create output directory if it doesn't exist
+    # Create directories if they don't exist
+    input_dir.mkdir(exist_ok=True, parents=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Check if the code processor API is available

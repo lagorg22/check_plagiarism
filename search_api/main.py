@@ -28,18 +28,18 @@ app = FastAPI(
 # Constants
 EMBEDDING_DIM = 768
 TOP_K = 3  # Number of similar files to return
-EMBEDDING_API_URL = "http://localhost:8003/embed"  # URL of the embedding API
-CODE_PROCESSOR_API_URL = "http://localhost:8004/process"  # URL of the code processor API
+EMBEDDING_API_URL = "http://embedding_api:8002/embed"  # URL of the embedding API
+CODE_PROCESSOR_API_URL = "http://code_processor:8004/process"  # URL of the code processor API
 
 # Path setup
 def get_root_dir():
     """Get the root directory of the project."""
-    current_file = Path(__file__)
-    return current_file.parent.parent  # Go up from search_api to project root
+    # In Docker, the app directory is /app
+    return Path("/app")
 
 # Paths
 ROOT_DIR = get_root_dir()
-EMBEDDINGS_DIR = ROOT_DIR / "shared" / "embeddings"
+EMBEDDINGS_DIR = Path("/app/shared/embeddings")
 FILE_PATHS_JSON = EMBEDDINGS_DIR / "file_paths.json"
 EMBEDDINGS_NPY = EMBEDDINGS_DIR / "embeddings.npy"
 FAISS_INDEX = EMBEDDINGS_DIR / "faiss_index.bin"
@@ -87,7 +87,7 @@ async def startup_load_index():
     
     # Check if embedding API is available
     try:
-        response = requests.get("http://localhost:8003/health")
+        response = requests.get("http://embedding_api:8002/health")
         if response.status_code == 200 and response.json().get("status") == "healthy":
             print("Successfully connected to embedding API")
         else:
@@ -207,7 +207,7 @@ async def search_similar_code(request: CodeRequest):
 async def check_dependencies():
     """Check if the code processor API is available at startup."""
     try:
-        response = requests.get("http://localhost:8004/health")
+        response = requests.get("http://code_processor:8004/health")
         if response.status_code == 200 and response.json().get("status") == "healthy":
             print("Successfully connected to code processor API")
         else:
@@ -222,7 +222,7 @@ async def health_check():
     return {"status": "healthy", "files_indexed": len(file_paths) if file_paths else 0}
 
 # Root endpoint
-@app.get("/")
+@app.get("x/")
 async def root():
     """Root endpoint with basic information."""
     return {

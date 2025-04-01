@@ -45,7 +45,7 @@ def flatten_all_repositories(parent_dir, extensions, target_dir):
     used_names = set()
     
     # List of repository directories to process
-    repo_dirs = ['cs108', 'cs106b-stanford', 'bio', 'copart_myauto', 'free-python-games', 'projects-React', 'e-commerce']
+    repo_dirs = ['cs108', 'cs106b-stanford', 'bio', 'e-commerce', 'projects-React']
     
     # Process each repository
     for repo_name in repo_dirs:
@@ -69,13 +69,14 @@ def flatten_all_repositories(parent_dir, extensions, target_dir):
     print(f"All code files have been flattened into {target_dir}")
 
 if __name__ == "__main__":
-    # Define directory paths
-    current_dir = os.path.dirname(os.path.abspath(__file__))  # Get current script directory
-    repos_dir = current_dir  # Repositories are in the same directory as the script
-    codefiles_dir = os.path.join(os.path.dirname(current_dir), "shared/codefiles")  # ../shared/codefiles
+    repos_dir = "/app"  # Repositories were copied to /app in the container
+    codefiles_dir = "/app/shared/codefiles"  # Shared volume mounted at /app/shared
     
     # Define code file extensions
     extensions = ['.py', '.java', '.c', '.cc', '.cpp', '.h', '.js', '.xml', '.html']
+    
+    # Create target directory if it doesn't exist
+    os.makedirs(codefiles_dir, exist_ok=True)
     
     # Extract and flatten code files from repositories
     flatten_all_repositories(repos_dir, extensions, codefiles_dir)

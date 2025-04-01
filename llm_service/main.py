@@ -156,24 +156,18 @@ async def call_deepseek(prompt: str, config: LLMConfig) -> str:
 def get_file_content(file_path: str) -> str:
     """Read the content of a file given its path."""
     try:
-        # Get root directory (resolving to absolute path)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(current_dir, ".."))
-        
-        # Define the processed_codefiles directory (absolute path)
-        processed_codefiles_dir = os.path.join(project_root, "shared", "processed_codefiles")
+        # In Docker, the shared directory is mounted at /app/shared
+        processed_codefiles_dir = "/app/shared/processed_codefiles"
         
         # List of potential paths to try
         search_paths = [
             file_path,  # Try the exact path first
-            os.path.join(project_root, file_path),  # Try relative to project root
+            os.path.join("/app/shared", file_path),  # Try relative to shared directory
             os.path.join(processed_codefiles_dir, file_path),  # Try in processed_codefiles
             os.path.join(processed_codefiles_dir, os.path.basename(file_path)),  # Try just the filename
         ]
         
         print(f"Looking for file: {file_path}")
-        print(f"Current directory: {current_dir}")
-        print(f"Project root (resolved): {project_root}")
         print(f"Processed codefiles directory: {processed_codefiles_dir}")
         
         # First try the predefined paths

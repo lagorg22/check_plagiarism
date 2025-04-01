@@ -26,8 +26,8 @@ app = FastAPI(
 )
 
 # Configuration
-SEARCH_API_URL = "http://localhost:8000/search"
-LLM_API_URL = "http://localhost:8001/check_plagiarism"
+SEARCH_API_URL = "http://search_api:8003/search"
+LLM_API_URL = "http://llm_service:8005/check_plagiarism"
 
 # Models for internal use
 class SimilarFile(BaseModel):
@@ -175,11 +175,11 @@ async def health_check():
     """Health check endpoint."""
     try:
         # Check search API
-        search_health = requests.get("http://localhost:8000/health", timeout=5)
+        search_health = requests.get("http://search_api:8003/health", timeout=5)
         search_status = "healthy" if search_health.status_code == 200 else "unhealthy"
         
         # Check LLM API
-        llm_health = requests.get("http://localhost:8001/health", timeout=5)
+        llm_health = requests.get("http://llm_service:8005/health", timeout=5)
         llm_status = "healthy" if llm_health.status_code == 200 else "unhealthy"
         
         return {

@@ -17,24 +17,22 @@ from typing import List, Dict, Any
 # Constants
 EMBEDDING_DIM = 768  # Dimension of the snowflake-arctic-embed-m embeddings
 BATCH_SIZE = 8  # Adjust based on your available RAM
-EMBEDDING_API_URL = "http://localhost:8003/embed_batch"  # URL of the embedding API
+EMBEDDING_API_URL = "http://embedding_api:8002/embed_batch"  # URL of the embedding API
 
 def get_root_dir():
     """Get the root directory of the project."""
-    current_file = Path(__file__)
-    return current_file.parent.parent  # Go up from indexer to project root
+    return Path("/app")
 
 def setup_directories():
     """Create necessary directories if they don't exist."""
-    root_dir = get_root_dir()
-    embeddings_dir = root_dir / "shared" / "embeddings"
+    embeddings_dir = Path("/app/shared/embeddings")
     embeddings_dir.mkdir(exist_ok=True, parents=True)
     return embeddings_dir
 
 def check_embedding_api():
     """Check if the embedding API is available."""
     try:
-        response = requests.get("http://localhost:8003/health")
+        response = requests.get("http://embedding_api:8002/health")
         if response.status_code == 200 and response.json().get("status") == "healthy":
             print("Successfully connected to embedding API")
             return True
@@ -178,11 +176,10 @@ def main():
         print("ERROR: Embedding API is not available. Please ensure it's running at", EMBEDDING_API_URL)
         return
     
-    root_dir = get_root_dir()
-    processed_codefiles_dir = root_dir / "shared" / "processed_codefiles"
+    # In Docker, we use absolute paths
+    processed_codefiles_dir = Path("/app/shared/processed_codefiles")
     embeddings_dir = setup_directories()
     
-    print(f"Root directory: {root_dir}")
     print(f"Code files directory: {processed_codefiles_dir}")
     print(f"Embeddings directory: {embeddings_dir}")
     
