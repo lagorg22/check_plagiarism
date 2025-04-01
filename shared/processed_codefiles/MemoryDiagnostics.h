@@ -1,0 +1,2 @@
+long numAllocations();
+long numDeallocations();
