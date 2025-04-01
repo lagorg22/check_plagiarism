@@ -33,32 +33,16 @@ LLM_API_URL = "http://localhost:8001/check_plagiarism"
 class SimilarFile(BaseModel):
     file_path: str
     similarity_score: float
-    content: str = ""
+    content: str = ""  # Keep this for backward compatibility
 
 # Helper function to get the root directory of the project
 def get_root_dir():
     """Get the root directory of the project."""
-    current_file = Path(__file__)
-    return current_file.parent.parent  # Go up from orchestrator to project root
+    return os.getenv("PROJECT_ROOT", "/app")
 
-# Helper function to get content of a file
-def get_file_content(file_path: str) -> str:
-    """Get the content of a file from the processed_codefiles directory."""
-    try:
-        root_dir = get_root_dir()
-        full_path = root_dir / "shared" / "processed_codefiles" / file_path
-        
-        with open(full_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        return content
-    except Exception as e:
-        print(f"Error reading file {file_path}: {str(e)}")
-        return f"[Error reading file: {str(e)}]"
-
-# Helper function to convert text to JSON
+# Helper function to convert code text to JSON format
 def convert_code_to_json(text):
-    """Convert plain text code to JSON format."""
+    """Convert plain text code to a JSON payload."""
     return {"code": text}
 
 # Call the search API to find similar files
@@ -119,9 +103,8 @@ async def check_plagiarism(code: str = Body(..., media_type="text/plain")):
     1. Accepts plain text code
     2. Converts it to JSON format internally
     3. Calls the search API to find similar files
-    4. Reads the content of those files
-    5. Calls the LLM service to check for plagiarism
-    6. Returns a JSON response with the results
+    4. Calls the LLM service to check for plagiarism (LLM service will read file contents)
+    5. Returns a JSON response with the results
     """
     try:
         print(f"Received plagiarism check request for code of length: {len(code)}")
@@ -143,20 +126,17 @@ async def check_plagiarism(code: str = Body(..., media_type="text/plain")):
                 "similar_files": []
             }
         
-        # Prepare the similar files with content
+        # Prepare the similar files (without reading content)
         similar_files = []
         for file_data in similar_files_data:
-            file_path = file_data["file_path"]
-            content = get_file_content(file_path)
-            
             similar_file = SimilarFile(
-                file_path=file_path,
+                file_path=file_data["file_path"],
                 similarity_score=file_data["similarity_score"],
-                content=content
+                content=""  # Empty content - LLM service will read the files
             )
             similar_files.append(similar_file)
             
-            print(f"Added content for {file_path} ({len(content)} characters)")
+            print(f"Added file path: {file_data['file_path']}")
         
         # Call the LLM API
         llm_results = await call_llm_api(processed_code, similar_files)
