@@ -1,24 +1,23 @@
 '''
-This script generates embeddings for processed code files using the snowflake-arctic-embed-m model.
+This script generates embeddings for processed code files using the embedding API.
 The embeddings are then indexed using FAISS and saved to disk.
-Optimized for CPU-only usage.
+Now uses the embedding_api service instead of loading the model directly.
 '''
 
 import os
 import glob
-import torch
 import faiss
 import numpy as np
 import json
+import requests
 from pathlib import Path
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModel
 from typing import List, Dict, Any
 
 # Constants
-MODEL_NAME = "Snowflake/snowflake-arctic-embed-m"
 EMBEDDING_DIM = 768  # Dimension of the snowflake-arctic-embed-m embeddings
 BATCH_SIZE = 8  # Adjust based on your available RAM
+EMBEDDING_API_URL = "http://localhost:8003/embed_batch"  # URL of the embedding API
 
 def get_root_dir():
     """Get the root directory of the project."""
@@ -32,19 +31,19 @@ def setup_directories():
     embeddings_dir.mkdir(exist_ok=True, parents=True)
     return embeddings_dir
 
-def load_model():
-    """Load the embedding model and tokenizer."""
-    print("Loading tokenizer and model...")
-    
-    # Load the tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    
-    # Load the model with CPU optimizations
-    model = AutoModel.from_pretrained(MODEL_NAME)
-    model.eval()  # Set to evaluation mode
-    print(f"Successfully loaded {MODEL_NAME} model")
-    
-    return tokenizer, model
+def check_embedding_api():
+    """Check if the embedding API is available."""
+    try:
+        response = requests.get("http://localhost:8003/health")
+        if response.status_code == 200 and response.json().get("status") == "healthy":
+            print("Successfully connected to embedding API")
+            return True
+        else:
+            print(f"ERROR: Embedding API is not healthy: {response.json()}")
+            return False
+    except Exception as e:
+        print(f"ERROR: Could not connect to embedding API: {str(e)}")
+        return False
 
 def read_code_files(processed_codefiles_dir: Path) -> Dict[str, str]:
     """Read all processed code files."""
@@ -73,47 +72,61 @@ def read_code_files(processed_codefiles_dir: Path) -> Dict[str, str]:
     
     return code_files
 
-def generate_embeddings(model, tokenizer, code_files: Dict[str, str]):
-    """Generate embeddings for code files."""
-    print("Generating embeddings...")
+def generate_embeddings_batch(code_files: Dict[str, str]):
+    """Generate embeddings for code files using the embedding API."""
+    print("Generating embeddings via the embedding API...")
     
     file_paths = list(code_files.keys())
-    contents = list(code_files.values())
-    embeddings = []
+    embeddings_list = []
     
-    # Process in batches to save memory
-    for i in tqdm(range(0, len(contents), BATCH_SIZE), desc="Generating embeddings"):
-        batch_texts = contents[i:i + BATCH_SIZE]
+    # Process in batches to avoid overwhelming the API
+    for i in tqdm(range(0, len(file_paths), BATCH_SIZE), desc="Generating embeddings"):
         batch_files = file_paths[i:i + BATCH_SIZE]
         
-        print(f"\nProcessing batch {i//BATCH_SIZE + 1}/{(len(contents)-1)//BATCH_SIZE + 1}")
-        for j, file_path in enumerate(batch_files):
+        # Create a dictionary of files for this batch
+        batch_code_files = {file_path: code_files[file_path] for file_path in batch_files}
+        
+        print(f"\nProcessing batch {i//BATCH_SIZE + 1}/{(len(file_paths)-1)//BATCH_SIZE + 1}")
+        for file_path in batch_files:
             print(f"  - Embedding file: {file_path}")
         
-        # Tokenize
-        inputs = tokenizer(
-            batch_texts,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        )
-        
-        # Generate embeddings
-        with torch.no_grad():
-            outputs = model(**inputs)
-            # Use mean pooling
-            attention_mask = inputs["attention_mask"]
-            token_embeddings = outputs.last_hidden_state
-            input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-            batch_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-            batch_embeddings = batch_embeddings.cpu().numpy()
-        
-        print(f"Batch {i//BATCH_SIZE + 1} complete: {len(batch_embeddings)} embeddings generated")
-        embeddings.extend(batch_embeddings)
+        # Call the embedding API
+        try:
+            response = requests.post(
+                EMBEDDING_API_URL,
+                json={"code_snippets": batch_code_files},
+                timeout=120  # Longer timeout for batch processing
+            )
+            
+            if response.status_code != 200:
+                print(f"Error from embedding API: {response.text}")
+                raise Exception(f"Embedding API returned status code {response.status_code}")
+            
+            # Extract embeddings from response
+            embedding_data = response.json()
+            batch_embeddings = []
+            
+            # Ensure we maintain the same order as file_paths
+            for file_path in batch_files:
+                if file_path in embedding_data["embeddings"]:
+                    embedding = np.array(embedding_data["embeddings"][file_path], dtype="float32")
+                    batch_embeddings.append(embedding)
+                else:
+                    print(f"WARNING: No embedding returned for {file_path}")
+                    # Create a zero embedding as fallback
+                    batch_embeddings.append(np.zeros(EMBEDDING_DIM, dtype="float32"))
+            
+            print(f"Batch {i//BATCH_SIZE + 1} complete: {len(batch_embeddings)} embeddings generated")
+            embeddings_list.extend(batch_embeddings)
+            
+        except Exception as e:
+            print(f"Error generating embeddings for batch: {str(e)}")
+            # If the batch fails, add zero embeddings as placeholders
+            for _ in batch_files:
+                embeddings_list.append(np.zeros(EMBEDDING_DIM, dtype="float32"))
     
     # Convert to numpy array
-    embeddings_array = np.array(embeddings).astype('float32')
+    embeddings_array = np.array(embeddings_list).astype('float32')
     print(f"All embeddings generated. Shape: {embeddings_array.shape}")
     
     return file_paths, embeddings_array
@@ -160,6 +173,11 @@ def main():
     print("Starting Code Embedding Generation")
     print("=" * 80)
     
+    # First check if the embedding API is available
+    if not check_embedding_api():
+        print("ERROR: Embedding API is not available. Please ensure it's running at", EMBEDDING_API_URL)
+        return
+    
     root_dir = get_root_dir()
     processed_codefiles_dir = root_dir / "shared" / "processed_codefiles"
     embeddings_dir = setup_directories()
@@ -173,9 +191,6 @@ def main():
         print(f"Error: Directory {processed_codefiles_dir} does not exist!")
         return
     
-    # Load model and tokenizer
-    tokenizer, model = load_model()
-    
     # Read code files
     code_files = read_code_files(processed_codefiles_dir)
     
@@ -185,8 +200,8 @@ def main():
     
     print(f"Processing {len(code_files)} code files...")
     
-    # Generate embeddings
-    file_paths, embeddings = generate_embeddings(model, tokenizer, code_files)
+    # Generate embeddings using the embedding API
+    file_paths, embeddings = generate_embeddings_batch(code_files)
     
     # Create FAISS index
     index = create_faiss_index(embeddings)
