@@ -32,6 +32,12 @@ python3 process_codefiles.py
 echo ""
 echo "======================Codefiles Cleaned========================="
 
+echo "======================Generating Embeddings========================="
+echo ""
+python3 generate_embeddings.py
+echo ""
+echo "======================Embeddings Generated========================="
+
 echo "======================Removing Unnecessary Directories========================="
 echo ""
 rm -rf rm -rf cs108/ cs106b-stanford/ bio/ copart_myauto/ free-python-games/ projects-React/ e-commerce/
