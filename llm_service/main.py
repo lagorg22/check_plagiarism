@@ -8,8 +8,8 @@ This service:
 4. Returns "Yes" if the code is plagiarized, "No" otherwise
 """
 
-import os
 import requests
+import os
 import json
 from typing import List, Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
@@ -98,6 +98,14 @@ async def call_deepseek(prompt: str, config: LLMConfig) -> str:
             detail="DeepSeek API key not configured. Please set the DEEPSEEK_API_KEY environment variable."
         )
     
+    # Save the prompt to a file
+    try:
+        with open("previous_prompt.txt", "w", encoding="utf-8") as f:
+            f.write(prompt)
+        print("Saved prompt to file: previous_prompt.txt")
+    except Exception as e:
+        print(f"Error saving prompt to file: {str(e)}")
+    
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {config.api_key}"
@@ -145,6 +153,83 @@ async def call_deepseek(prompt: str, config: LLMConfig) -> str:
         print(f"Unexpected error when calling DeepSeek API: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+def get_file_content(file_path: str) -> str:
+    """Read the content of a file given its path."""
+    try:
+        # Get root directory (resolving to absolute path)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, ".."))
+        
+        # Define the processed_codefiles directory (absolute path)
+        processed_codefiles_dir = os.path.join(project_root, "shared", "processed_codefiles")
+        
+        # List of potential paths to try
+        search_paths = [
+            file_path,  # Try the exact path first
+            os.path.join(project_root, file_path),  # Try relative to project root
+            os.path.join(processed_codefiles_dir, file_path),  # Try in processed_codefiles
+            os.path.join(processed_codefiles_dir, os.path.basename(file_path)),  # Try just the filename
+        ]
+        
+        print(f"Looking for file: {file_path}")
+        print(f"Current directory: {current_dir}")
+        print(f"Project root (resolved): {project_root}")
+        print(f"Processed codefiles directory: {processed_codefiles_dir}")
+        
+        # First try the predefined paths
+        for path in search_paths:
+            print(f"Trying path: {path}")
+            if os.path.isfile(path):
+                print(f"✓ File found at: {path}")
+                with open(path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    print(f"Successfully read {len(content)} characters")
+                    return content
+        
+        # If file still not found, do a direct check of the processed_codefiles directory
+        if os.path.exists(processed_codefiles_dir):
+            print(f"Checking directory contents of: {processed_codefiles_dir}")
+            files_in_dir = os.listdir(processed_codefiles_dir)
+            print(f"Files in directory ({len(files_in_dir)} total):")
+            
+            # Print the first 10 files for debugging
+            for i, f in enumerate(sorted(files_in_dir)[:10]):
+                print(f"  {i+1}. {f}")
+            if len(files_in_dir) > 10:
+                print(f"  ... and {len(files_in_dir)-10} more files")
+            
+            # Check if our target file is in the directory (case sensitive and insensitive)
+            filename = os.path.basename(file_path)
+            if filename in files_in_dir:
+                full_path = os.path.join(processed_codefiles_dir, filename)
+                print(f"✓ Found exact filename match: {full_path}")
+                with open(full_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    print(f"Successfully read {len(content)} characters")
+                    return content
+                    
+            # Try case-insensitive match if exact match fails
+            lower_filename = filename.lower()
+            lower_files = {f.lower(): f for f in files_in_dir}
+            if lower_filename in lower_files:
+                actual_filename = lower_files[lower_filename]
+                full_path = os.path.join(processed_codefiles_dir, actual_filename)
+                print(f"✓ Found case-insensitive match: {full_path}")
+                with open(full_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    print(f"Successfully read {len(content)} characters")
+                    return content
+        else:
+            print(f"❌ Directory does not exist: {processed_codefiles_dir}")
+            
+        # If all attempts fail, return error message
+        print(f"❌ ERROR: File not found: {file_path}")
+        return f"[Error: File not found: {file_path}. Searched in {processed_codefiles_dir}]"
+        
+    except Exception as e:
+        print(f"❌ ERROR reading file {file_path}: {str(e)}")
+        return f"[Error reading file {file_path}: {str(e)}]"
+
 # Endpoint to check for plagiarism
 @app.post("/check_plagiarism", response_model=PlagiarismCheckResponse)
 async def check_plagiarism(
@@ -155,10 +240,11 @@ async def check_plagiarism(
     Check if the provided code is plagiarized from any of the similar files.
     
     The service:
-    1. Takes the user's code and the similar files with their content
-    2. Constructs a prompt for the DeepSeek LLM
-    3. Sends the prompt to DeepSeek and gets a response
-    4. Returns "Yes" if the code is plagiarized, "No" otherwise
+    1. Takes the user's code and the similar files with their paths
+    2. Reads the content of the files if not provided
+    3. Constructs a prompt for the DeepSeek LLM
+    4. Sends the prompt to DeepSeek and gets a response
+    5. Returns "Yes" if the code is plagiarized, "No" otherwise
     """
     try:
         print(f"Received request to check plagiarism for code with {len(request.user_code)} characters")
@@ -171,16 +257,31 @@ async def check_plagiarism(
         if not request.similar_files:
             raise HTTPException(status_code=400, detail="At least one similar file is required")
         
-        # Log similar files info
+        # Process similar files - read content if empty
+        similar_files_with_content = []
         for i, file in enumerate(request.similar_files):
-            print(f"Similar file {i+1}: {file.file_path} (Score: {file.similarity_score}, Content length: {len(file.content)} chars)")
+            # Create a copy of the file to avoid modifying the original
+            similar_file = SimilarFile(
+                file_path=file.file_path,
+                similarity_score=file.similarity_score,
+                content=file.content
+            )
+            
+            # If content is empty, read it from the file
+            if not similar_file.content.strip():
+                print(f"Reading content for file: {file.file_path}")
+                similar_file.content = get_file_content(file.file_path)
+            
+            similar_files_with_content.append(similar_file)
+            
+            print(f"Similar file {i+1}: {file.file_path} (Score: {file.similarity_score}, Content length: {len(similar_file.content)} chars)")
             # Print a small snippet of each file for easier debugging
-            content_preview = file.content[:100] + "..." if len(file.content) > 100 else file.content
+            content_preview = similar_file.content[:100] + "..." if len(similar_file.content) > 100 else similar_file.content
             print(f"Content preview: {content_preview}")
         
         # Construct the prompt
         print("Constructing prompt for DeepSeek API...")
-        prompt = construct_prompt(request.user_code, request.similar_files)
+        prompt = construct_prompt(request.user_code, similar_files_with_content)
         
         # Call the DeepSeek API
         print("Calling DeepSeek API...")
