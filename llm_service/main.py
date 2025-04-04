@@ -55,7 +55,7 @@ def get_llm_config():
 
 # Construct the prompt for the LLM
 def construct_prompt(user_code: str, similar_files: List[SimilarFile]) -> str:
-    prompt = """You are a code plagiarism detection system. Your task is to determine if the submitted code is plagiarized from any of the reference code files.
+    prompt = """You are a code plagiarism detection system designed to make fair and balanced assessments. Your task is to determine if the submitted code is likely plagiarized from any of the reference code files.
 
 Please analyze the following submitted code:
 
@@ -71,18 +71,27 @@ Compare it with these reference code files that were found to be similar:
     for i, file in enumerate(similar_files, 1):
         prompt += f"Reference File {i} ({file.file_path}):\n```\n{file.content}\n```\n\n"
     
-    prompt += """Based on your analysis, is the submitted code plagiarized from any of the reference files?
+    prompt += """Based on your analysis, determine if the submitted code is plagiarized from any of the reference files.
 
-Consider the following as strong indicators of plagiarism:
-1. Nearly identical code structure or algorithm implementation
-2. Same variable names and function structures
-3. Similar comments, especially distinctive ones
-4. Identical code sections with only minor changes like variable renaming
-5. Same code patterns, especially if it's a unique approach
+Consider these guidelines for your assessment:
 
-For the purpose of this analysis, consider plagiarism as code that appears to be copied, with or without minor modifications, from one of the reference files.
+INDICATORS OF PLAGIARISM:
+1. Nearly identical code structure with the same implementation approach
+2. Same variable names AND function structures appearing together
+3. Distinctive or unusual comments that are identical or very similar
+4. Multiple identical code blocks with only superficial changes like variable renaming
+5. Identical handling of edge cases or unusual implementation techniques
 
-Reply with ONLY "Yes" if the code shows clear signs of plagiarism from any reference file, or "No" if it appears to be original.
+INDICATORS OF ORIGINAL WORK:
+1. Similar algorithms but with different implementation approaches
+2. Standard coding patterns that are common in the language or domain
+3. Different variable names, control structures, or logical organization
+4. Different comments or documentation style
+5. Substantive differences in handling edge cases or error conditions
+
+Remember that certain problems naturally have similar solutions, especially for standard algorithms. Common approaches to well-known problems should not be considered plagiarism unless there are specific unique characteristics copied from a reference file.
+
+Reply with "Yes" if the code shows clear signs of plagiarism from any reference file, or "No" if it appears to be original or just follows standard approaches.
 
 Your response:"""
     
