@@ -49,14 +49,20 @@ The system consists of several microservices that work together to detect code p
 
 2. Run the setup script:
    ```
+   (if you want to test with another repositories change them in setup.sh)
    chmod +x setup.sh
    ./setup.sh
    ```
 
+3. comment the code suggested in docker-compose yaml:
+   ```
+   indexer is only needed for initial setup, after this it can be removed.
+   ```
+
 The setup script will:
-- Build Docker containers for all services
+- Build Docker containers for all services (embeddings build takes time because of huge dependencies)
 - Clone repositories for indexing
-- Process and index code files
+- Process and index code files (takes time because of embeddings generation)
 - Start all services
 
 ## Docker Configuration
@@ -125,8 +131,6 @@ The system includes an evaluation component for testing and measuring performanc
 2. Run the evaluation script: `python simple_evaluation.py`
 3. Review results in the generated CSV and console output
 
-For interactive evaluation, use the Jupyter notebook at http://localhost:8888
-
 ## LLM Plagiarism Detection
 
 The LLM service uses DeepSeek Coder to analyze code similarities. The prompt is designed to:
@@ -146,13 +150,7 @@ The system uses a Docker volume to share data between services:
 
 Each service has its own:
 - Requirements file for Python dependencies
-- README file with service-specific information
 - Dockerfile for containerization
-
-To modify a service:
-1. Make changes to the service code
-2. Rebuild with: `docker-compose build service_name`
-3. Restart with: `docker-compose up -d service_name`
 
 ## Troubleshooting
 

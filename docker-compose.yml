@@ -25,23 +25,19 @@ services:
       timeout: 10s
       retries: 3
 
-#temporarily disabled, only needed for initial setup
-  # indexer:
-  #   build: ./indexer
-  #   ports:
-  #     - "8001:8001"
-  #   volumes:
-  #     - shared:/app/shared
-  #   networks:
-  #     - plagiarism_network
-  #   depends_on:
-  #     - code_processor
-  #     - embedding_api
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
+#comment this part out after initial setup
+  indexer:
+    build: ./indexer
+    ports:
+      - "8001:8001"
+    volumes:
+      - shared:/app/shared
+    networks:
+      - plagiarism_network
+    depends_on:
+      - code_processor
+      - embedding_api
+
 
   search_api:
     build: ./search_api
