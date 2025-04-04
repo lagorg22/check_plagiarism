@@ -1,0 +1,91 @@
+package tetris;
+
+import java.util.*;
+
+class BlockShape {
+    private final TPoint[] structure;
+    private final int[] floor;
+    private final int w, h;
+    private BlockShape nextRotation;
+    
+    static private BlockShape[] presets;
+    
+    BlockShape(TPoint[] points) {
+        structure = points.clone();
+        Arrays.sort(structure);
+        
+        w = Arrays.stream(structure).mapToInt(p -> p.x).max().orElse(0) + 1;
+        h = Arrays.stream(structure).mapToInt(p -> p.y).max().orElse(0) + 1;
+        
+        floor = new int[w];
+        Arrays.fill(floor, h);
+        for (TPoint p : structure) {
+            if (floor[p.x] > p.y) floor[p.x] = p.y;
+        }
+    }
+    
+    BlockShape(String def) {
+        this(parseDefinition(def));
+    }
+    
+    public int getWidth() { return w; }
+    public int getHeight() { return h; }
+    public TPoint[] getStructure() { return structure; }
+    public int[] getFloor() { return floor; }
+    
+    public BlockShape rotate() {
+        TPoint[] rotated = new TPoint[structure.length];
+        for (int i = 0; i < structure.length; i++) {
+            TPoint p = structure[i];
+            rotated[i] = new TPoint(h - p.y - 1, p.x);
+        }
+        return new BlockShape(rotated);
+    }
+    
+    public BlockShape getNextRotation() {
+        return nextRotation;
+    }
+    
+    public boolean equals(Object obj) {
+        return obj instanceof BlockShape && 
+               Arrays.equals(structure, ((BlockShape)obj).structure);
+    }
+    
+    public static BlockShape[] getAllPresets() {
+        if (presets == null) {
+            String[] shapes = {
+                "0 0 0 1 0 2 0 3", "0 0 0 1 0 2 1 0",
+                "0 0 1 0 1 1 1 2", "0 0 1 0 1 1 2 1",
+                "0 1 1 1 1 0 2 0", "0 0 0 1 1 0 1 1",
+                "0 0 1 0 1 1 2 0"
+            };
+            presets = Arrays.stream(shapes)
+                .map(s -> createRotationCycle(new BlockShape(s)))
+                .toArray(BlockShape[]::new);
+        }
+        return presets;
+    }
+    
+    private static BlockShape createRotationCycle(BlockShape root) {
+        BlockShape current = root;
+        BlockShape next = root.rotate();
+        while (!next.equals(root)) {
+            current.nextRotation = next;
+            current = next;
+            next = next.rotate();
+        }
+        current.nextRotation = root;
+        return root;
+    }
+    
+    private static TPoint[] parseDefinition(String def) {
+        String[] tokens = def.split("\\s+");
+        List<TPoint> points = new LinkedList<>();
+        for (int i = 0; i < tokens.length; i += 2) {
+            int x = Integer.parseInt(tokens[i]);
+            int y = Integer.parseInt(tokens[i+1]);
+            points.add(new TPoint(x, y));
+        }
+        return points.toArray(new TPoint[0]);
+    }
+}

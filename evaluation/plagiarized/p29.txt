@@ -1,0 +1,71 @@
+class PriorityHeap {
+    static const int BASE_CAPACITY = 10;
+    string* elements;
+    int currentSize;
+    int maxCapacity;
+
+    void resize() {
+        int newCapacity = maxCapacity * 1.5 + 1;
+        string* newArray = new string[newCapacity];
+        for (int i = 0; i < currentSize; i++) {
+            newArray[i] = elements[i];
+        }
+        delete[] elements;
+        elements = newArray;
+        maxCapacity = newCapacity;
+    }
+
+    void siftUp(int pos) {
+        while (pos > 0) {
+            int parent = (pos - 1) / 2;
+            if (elements[pos] >= elements[parent]) break;
+            swap(elements[pos], elements[parent]);
+            pos = parent;
+        }
+    }
+
+    void siftDown(int pos) {
+        while (true) {
+            int left = 2 * pos + 1;
+            int right = 2 * pos + 2;
+            int smallest = pos;
+            
+            if (left < currentSize && elements[left] < elements[smallest])
+                smallest = left;
+            if (right < currentSize && elements[right] < elements[smallest])
+                smallest = right;
+                
+            if (smallest == pos) break;
+            swap(elements[pos], elements[smallest]);
+            pos = smallest;
+        }
+    }
+
+public:
+    PriorityHeap() : elements(new string[BASE_CAPACITY]), 
+                    currentSize(0), maxCapacity(BASE_CAPACITY) {}
+    
+    ~PriorityHeap() { delete[] elements; }
+
+    void add(string item) {
+        if (currentSize == maxCapacity) resize();
+        elements[currentSize++] = item;
+        siftUp(currentSize - 1);
+    }
+
+    string getFirst() {
+        if (currentSize == 0) throw runtime_error("Heap is empty");
+        return elements[0];
+    }
+
+    string removeMin() {
+        if (currentSize == 0) throw runtime_error("Empty heap");
+        string root = getFirst();
+        elements[0] = elements[--currentSize];
+        siftDown(0);
+        return root;
+    }
+
+    int getCount() const { return currentSize; }
+    bool hasItems() const { return currentSize > 0; }
+};

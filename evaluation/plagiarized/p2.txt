@@ -1,0 +1,54 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <map>
+#include <set>
+
+std::map<char, std::set<std::string>> readCodonFile();
+std::set<std::string> findRNAPaths(const std::string& protein, std::map<char, std::set<std::string>>& codons);
+
+int main() {
+	auto codons = readCodonFile();
+	std::string sequence;
+
+	std::cout << "Protein sequence: ";
+	std::getline(std::cin, sequence);
+
+	auto combinations = findRNAPaths(sequence, codons);
+
+	for (const auto& rna : combinations) {
+		std::cout << rna << "\n";
+	}
+	return 0;
+}
+
+std::set<std::string> findRNAPaths(const std::string& protein, std::map<char, std::set<std::string>>& codons) {
+	std::set<std::string> output;
+
+	if (protein.empty()) return output;
+
+	if (protein.size() == 1) {
+		return codons[protein[0]];
+	}
+
+	auto tailResult = findRNAPaths(protein.substr(1), codons);
+
+	for (auto& currentCodon : codons[protein[0]]) {
+		for (auto& suffix : tailResult) {
+			output.insert(currentCodon + suffix);
+		}
+	}
+	return output;
+}
+
+std::map<char, std::set<std::string>> readCodonFile() {
+	std::ifstream input("codons.txt");
+	std::map<char, std::set<std::string>> codonMap;
+	std::string codon;
+	char amino;
+
+	while (input >> codon >> amino) {
+		codonMap[amino].insert(codon);
+	}
+	return codonMap;
+}

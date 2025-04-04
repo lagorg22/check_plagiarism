@@ -1,0 +1,24 @@
+import random
+import statistics
+
+def generate_data(n=100):
+    return [random.gauss(50, 15) for _ in range(n)]
+
+def analyze_data(data):
+    print(f"Number of data points: {len(data)}")
+    print(f"Mean: {statistics.mean(data):.2f}")
+    print(f"Median: {statistics.median(data):.2f}")
+    print(f"Standard Deviation: {statistics.stdev(data):.2f}")
+    print(f"Minimum: {min(data):.2f}")
+    print(f"Maximum: {max(data):.2f}")
+
+def filter_data(data, threshold):
+    return [x for x in data if x > threshold]
+
+if __name__ == "__main__":
+    my_data = generate_data()
+    analyze_data(my_data)
+    filtered_data = filter_data(my_data, 60)
+    print(f"\nNumber of data points above 60: {len(filtered_data)}")
+    if filtered_data:
+        print(f"First 10 above 60: {filtered_data[:10]}")

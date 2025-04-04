@@ -1,0 +1,90 @@
+// Modular service worker implementation
+// Utilizes functional composition and different abstraction layers
+
+const checkLocalEnvironment = () => {
+  const { hostname } = window.location;
+  return [
+    'localhost',
+    '[::1]',
+    /^127(\.(25[0-5]|2[0-4]\d|1?\d\d?)){3}$/
+  ].some(condition => 
+    typeof condition === 'string' 
+      ? hostname === condition 
+      : condition.test(hostname)
+  );
+};
+
+const createWorkerURL = () => 
+  `${process.env.PUBLIC_URL}/service-worker.js`;
+
+const validateOrigin = () => {
+  const publicOrigin = new URL(process.env.PUBLIC_URL, window.location.href).origin;
+  return publicOrigin === window.location.origin;
+};
+
+const handleWorkerState = (worker, config, registration) => {
+  const stateHandler = () => {
+    if (worker.state !== 'installed') return;
+    
+    const message = navigator.serviceWorker.controller
+      ? 'Updated resources pending tab closure'
+      : 'All assets cached for offline';
+    console.log(message);
+
+    const callback = navigator.serviceWorker.controller 
+      ? config?.onUpdate 
+      : config?.onSuccess;
+    callback?.(registration);
+  };
+  
+  worker.addEventListener('statechange', stateHandler);
+};
+
+const processRegistration = (registration, config) => {
+  registration.onupdatefound = () => {
+    const workerInstance = registration.installing;
+    workerInstance && handleWorkerState(workerInstance, config, registration);
+  };
+};
+
+export function enableServiceWorker(config) {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (!navigator.serviceWorker || !validateOrigin()) return;
+
+  window.addEventListener('load', () => {
+    const swUrl = createWorkerURL();
+    
+    checkLocalEnvironment()
+      ? performValidationCheck(swUrl, config)
+      : initiateRegistration(swUrl, config);
+  });
+}
+
+const initiateRegistration = (url, config) => {
+  navigator.serviceWorker.register(url)
+    .then(reg => processRegistration(reg, config))
+    .catch(e => console.error('Worker setup error:', e));
+};
+
+const performValidationCheck = async (url, config) => {
+  try {
+    const response = await fetch(url, { headers: { 'SW-Reg': 'true' } });
+    const contentTypeValid = response.headers.get('content-type')?.includes('javascript');
+    
+    if (response.status === 404 || !contentTypeValid) {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.unregister();
+      window.location.reload();
+      return;
+    }
+    initiateRegistration(url, config);
+  } catch {
+    console.log('No network connection - offline mode active');
+  }
+};
+
+export const disableServiceWorker = () => {
+  navigator.serviceWorker?.ready
+    .then(registration => registration.unregister())
+    .catch(error => console.warn('Deactivation error:', error));
+};

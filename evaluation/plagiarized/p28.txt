@@ -1,0 +1,132 @@
+#include <unordered_map>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <iostream>
+
+struct CodeNode {
+    ext_char value;
+    int weight;
+    CodeNode *child0, *child1;
+    CodeNode(ext_char v, int w, CodeNode* c0 = nullptr, CodeNode* c1 = nullptr)
+        : value(v), weight(w), child0(c0), child1(c1) {}
+};
+
+std::unordered_map<ext_char, int> tallyOccurrences(std::istream& data) {
+    std::unordered_map<ext_char, int> tally;
+    tally[PSEUDO_EOF] = 1;
+    char ch;
+    while (data.get(ch)) {
+        tally[ch]++;
+    }
+    return tally;
+}
+
+CodeNode* constructCodeTree(const std::unordered_map<ext_char, int>& tally) {
+    auto compareNodes = [](CodeNode* n1, CodeNode* n2) { return n1->weight > n2->weight; };
+    std::vector<CodeNode*> nodeHeap;
+    for (const auto& kv : tally) {
+        nodeHeap.push_back(new CodeNode(kv.first, kv.second));
+    }
+    std::make_heap(nodeHeap.begin(), nodeHeap.end(), compareNodes);
+    while (nodeHeap.size() > 1) {
+        std::pop_heap(nodeHeap.begin(), nodeHeap.end(), compareNodes);
+        CodeNode* smallest1 = nodeHeap.back(); nodeHeap.pop_back();
+        std::pop_heap(nodeHeap.begin(), nodeHeap.end(), compareNodes);
+        CodeNode* smallest2 = nodeHeap.back(); nodeHeap.pop_back();
+        CodeNode* combined = new CodeNode(NOT_A_CHAR, smallest1->weight + smallest2->weight, smallest1, smallest2);
+        nodeHeap.push_back(combined);
+        std::push_heap(nodeHeap.begin(), nodeHeap.end(), compareNodes);
+    }
+    return nodeHeap.empty() ? nullptr : nodeHeap.front();
+}
+
+void releaseTree(CodeNode* node) {
+    if (!node) return;
+    releaseTree(node->child0);
+    releaseTree(node->child1);
+    delete node;
+}
+
+void encodeContent(std::istream& input, CodeNode* tree, obstream& output) {
+    std::unordered_map<ext_char, std::string> bitCodes = fetchBitCodes(tree);
+    char ch;
+    while (input.get(ch)) {
+        for (char bit : bitCodes[ch]) {
+            output.writeBit(bit - '0');
+        }
+    }
+    for (char bit : bitCodes[PSEUDO_EOF]) {
+        output.writeBit(bit - '0');
+    }
+}
+
+std::unordered_map<ext_char, std::string> fetchBitCodes(CodeNode* root) {
+    std::unordered_map<ext_char, std::string> codes;
+    std::string path;
+    exploreTree(root, codes, path);
+    return codes;
+}
+
+void exploreTree(CodeNode* node, std::unordered_map<ext_char, std::string>& codes, std::string path) {
+    if (!node) return;
+    if (node->value != NOT_A_CHAR) {
+        codes[node->value] = path.empty() ? "0" : path;
+    }
+    exploreTree(node->child0, codes, path + "0");
+    exploreTree(node->child1, codes, path + "1");
+}
+
+void decodeContent(ibstream& input, CodeNode* tree, std::ostream& output) {
+    CodeNode* cursor = tree;
+    int bit;
+    while ((bit = input.readBit()) != -1) {
+        cursor = bit ? cursor->child1 : cursor->child0;
+        if (cursor->value != NOT_A_CHAR) {
+            if (cursor->value == PSEUDO_EOF) break;
+            output.put(static_cast<char>(cursor->value));
+            cursor = tree;
+        }
+    }
+}
+
+void writeMetadata(obstream& output, const std::unordered_map<ext_char, int>& tally) {
+    output << tally.size() - 1 << ' ';
+    for (const auto& pair : tally) {
+        if (pair.first != PSEUDO_EOF) {
+            output << static_cast<char>(pair.first) << pair.second << ' ';
+        }
+    }
+}
+
+std::unordered_map<ext_char, int> readMetadata(ibstream& input) {
+    std::unordered_map<ext_char, int> tally;
+    int size;
+    input >> size;
+    input.get();
+    for (int i = 0; i < size; ++i) {
+        ext_char key = input.get();
+        int val;
+        input >> val;
+        input.get();
+        tally[key] = val;
+    }
+    tally[PSEUDO_EOF] = 1;
+    return tally;
+}
+
+void runCompression(ibstream& input, obstream& output) {
+    std::unordered_map<ext_char, int> tally = tallyOccurrences(input);
+    input.rewind();
+    writeMetadata(output, tally);
+    CodeNode* tree = constructCodeTree(tally);
+    encodeContent(input, tree, output);
+    releaseTree(tree);
+}
+
+void runDecompression(ibstream& input, std::ostream& output) {
+    std::unordered_map<ext_char, int> tally = readMetadata(input);
+    CodeNode* tree = constructCodeTree(tally);
+    decodeContent(input, tree, output);
+    releaseTree(tree);
+}

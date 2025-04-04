@@ -1,0 +1,29 @@
+public class StringOperations {
+    public static void main(String[] args) {
+        String message = "This is a sample string with some words.";
+        System.out.println("Original String: " + message);
+
+        String upperCase = message.toUpperCase();
+        System.out.println("Uppercase: " + upperCase);
+
+        String lowerCase = message.toLowerCase();
+        System.out.println("Lowercase: " + lowerCase);
+
+        String[] words = message.split(" ");
+        System.out.println("Number of words: " + words.length);
+        System.out.print("First 3 words: ");
+        for (int i = 0; i < Math.min(3, words.length); i++) {
+            System.out.print(words[i] + " ");
+        }
+        System.out.println();
+
+        String replaced = message.replace("sample", "modified");
+        System.out.println("Replaced String: " + replaced);
+
+        boolean startsWithThis = message.startsWith("This");
+        System.out.println("Starts with 'This': " + startsWithThis);
+
+        boolean endsWithPeriod = message.endsWith(".");
+        System.out.println("Ends with '.': " + endsWithPeriod);
+    }
+}

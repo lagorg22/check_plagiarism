@@ -1,0 +1,74 @@
+import datetime
+import os
+import hashlib
+import json
+import requests
+
+def get_current_time():
+    now = datetime.datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S")
+
+def create_directory_if_not_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        print(f"Created directory: {path}")
+    else:
+        print(f"Directory already exists: {path}")
+
+def calculate_md5(text):
+    m = hashlib.md5()
+    m.update(text.encode('utf-8'))
+    return m.hexdigest()
+
+def save_to_json(data, filename="data.json"):
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=4)
+    print(f"Data saved to {filename}")
+
+def fetch_random_joke():
+    try:
+        response = requests.get("https://official-joke-api.appspot.com/random_joke")
+        response.raise_for_status()
+        joke_data = response.json()
+        return f"{joke_data['setup']} {joke_data['punch']}"
+    except requests.exceptions.RequestException as e:
+        return f"Failed to fetch joke: {e}"
+
+if __name__ == "__main__":
+    print("Current Time:", get_current_time())
+
+    temp_dir = "temp_files"
+    create_directory_if_not_exists(temp_dir)
+
+    random_string = "This is a random string."
+    md5_hash = calculate_md5(random_string)
+    print(f"\nMD5 Hash of '{random_string}': {md5_hash}")
+
+    sample_data = {
+        "name": "Example",
+        "value": 123,
+        "items": [1, 2, 3]
+    }
+    save_to_json(sample_data, os.path.join(temp_dir, "sample.json"))
+
+    joke = fetch_random_joke()
+    print("\nRandom Joke:", joke)
+
+    file_path = os.path.join(temp_dir, "example.txt")
+    with open(file_path, 'w') as f:
+        f.write("This is some text written to a file.\n")
+        f.write(f"Current timestamp: {get_current_time()}\n")
+    print(f"\nWrote to file: {file_path}")
+
+    try:
+        with open("non_existent_file.txt", 'r') as f:
+            content = f.read()
+            print("Read from non-existent file:", content)
+    except FileNotFoundError:
+        print("\nCaught a FileNotFoundError as expected.")
+
+    numbers = [5, 1, 9, 3, 7]
+    sorted_numbers = sorted(numbers)
+    print("\nSorted Numbers:", sorted_numbers)
+
+    print("\nEnd of another random code.")

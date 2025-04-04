@@ -1,0 +1,131 @@
+#include <map>
+#include <queue>
+#include <vector>
+#include <string>
+#include <iostream>
+
+struct HuffmanLeaf {
+    ext_char symbol;
+    int count;
+    HuffmanLeaf *leftPtr, *rightPtr;
+    HuffmanLeaf(ext_char s, int c, HuffmanLeaf* l = nullptr, HuffmanLeaf* r = nullptr)
+        : symbol(s), count(c), leftPtr(l), rightPtr(r) {}
+};
+
+std::map<ext_char, int> gatherSymbolCounts(std::istream& source) {
+    std::map<ext_char, int> counts;
+    counts[PSEUDO_EOF] = 1;
+    char byte;
+    while (source.get(byte)) {
+        counts[byte]++;
+    }
+    return counts;
+}
+
+HuffmanLeaf* assembleTree(const std::map<ext_char, int>& counts) {
+    struct LeafCompare {
+        bool operator()(HuffmanLeaf* a, HuffmanLeaf* b) const { return a->count > b->count; }
+    };
+    std::priority_queue<HuffmanLeaf*, std::vector<HuffmanLeaf*>, LeafCompare> leafQueue;
+    for (const auto& entry : counts) {
+        leafQueue.push(new HuffmanLeaf(entry.first, entry.second));
+    }
+    while (leafQueue.size() > 1) {
+        HuffmanLeaf* first = leafQueue.top(); leafQueue.pop();
+        HuffmanLeaf* second = leafQueue.top(); leafQueue.pop();
+        leafQueue.push(new HuffmanLeaf(NOT_A_CHAR, first->count + second->count, first, second));
+    }
+    return leafQueue.empty() ? nullptr : leafQueue.top();
+}
+
+void cleanupTree(HuffmanLeaf* node) {
+    if (!node) return;
+    cleanupTree(node->leftPtr);
+    cleanupTree(node->rightPtr);
+    delete node;
+}
+
+std::map<ext_char, std::string> compileCodeTable(HuffmanLeaf* root) {
+    std::map<ext_char, std::string> codeTable;
+    std::string sequence;
+    generateCodes(root, codeTable, sequence);
+    return codeTable;
+}
+
+void generateCodes(HuffmanLeaf* node, std::map<ext_char, std::string>& table, std::string seq) {
+    if (!node) return;
+    if (node->symbol != NOT_A_CHAR) {
+        table[node->symbol] = seq.empty() ? "0" : seq;
+    }
+    generateCodes(node->leftPtr, table, seq + "0");
+    generateCodes(node->rightPtr, table, seq + "1");
+}
+
+void outputBits(obstream& dest, const std::string& bits) {
+    for (char b : bits) {
+        dest.writeBit(b == '1' ? 1 : 0);
+    }
+}
+
+void compressStream(std::istream& input, HuffmanLeaf* tree, obstream& output) {
+    std::map<ext_char, std::string> codes = compileCodeTable(tree);
+    char byte;
+    while (input.get(byte)) {
+        outputBits(output, codes[byte]);
+    }
+    outputBits(output, codes[PSEUDO_EOF]);
+}
+
+void decompressStream(ibstream& input, HuffmanLeaf* tree, std::ostream& output) {
+    HuffmanLeaf* currentNode = tree;
+    int bit;
+    while ((bit = input.readBit()) != -1) {
+        currentNode = bit ? currentNode->rightPtr : currentNode->leftPtr;
+        if (currentNode->symbol != NOT_A_CHAR) {
+            if (currentNode->symbol == PSEUDO_EOF) break;
+            output.put(static_cast<char>(currentNode->symbol));
+            currentNode = tree;
+        }
+    }
+}
+
+void emitHeader(obstream& output, const std::map<ext_char, int>& counts) {
+    output << counts.size() - 1 << ' ';
+    for (const auto& entry : counts) {
+        if (entry.first != PSEUDO_EOF) {
+            output << static_cast<char>(entry.first) << entry.second << ' ';
+        }
+    }
+}
+
+std::map<ext_char, int> parseHeader(ibstream& input) {
+    std::map<ext_char, int> counts;
+    int entryCount;
+    input >> entryCount;
+    input.get();
+    for (int i = 0; i < entryCount; ++i) {
+        ext_char sym = input.get();
+        int freq;
+        input >> freq;
+        input.get();
+        counts[sym] = freq;
+    }
+    counts[PSEUDO_EOF] = 1;
+    return counts;
+}
+
+void executeCompression(ibstream& input, obstream& output) {
+    std::map<ext_char, int> counts = gatherSymbolCounts(input);
+    input.rewind();
+    emitHeader(output, counts);
+    HuffmanLeaf* tree = assembleTree(counts);
+    compressStream(input, tree, output);
+    cleanupTree(tree);
+}
+
+void executeDecompression(ibstream& input, std::ostream& output) {
+    std::map<ext_char, int> counts = parseHeader(input);
+    HuffmanLeaf* tree = assembleTree(counts);
+    decompressStream(input, tree, output);
+    cleanupTree(tree);
+}

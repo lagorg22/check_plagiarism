@@ -1,0 +1,82 @@
+#include "pqueue-doublylinkedlist.h"
+#include "error.h"
+
+DoublyLinkedListPriorityQueue::DoublyLinkedListPriorityQueue() {
+    head = nullptr;
+    count = 0;
+}
+
+DoublyLinkedListPriorityQueue::~DoublyLinkedListPriorityQueue() {
+    while (head != nullptr) {
+        Cell* tmp = head;
+        head = head->next;
+        delete tmp;
+    }
+}
+
+int DoublyLinkedListPriorityQueue::size() {
+    return count;
+}
+
+bool DoublyLinkedListPriorityQueue::isEmpty() {
+    return (count == 0);
+}
+
+void DoublyLinkedListPriorityQueue::enqueue(string str) {
+    Cell* node = new Cell;
+    node->value = str;
+    node->prev = nullptr;
+    node->next = head;
+
+    if (head != nullptr) {
+        head->prev = node;
+    }
+    head = node;
+    count += 1;
+}
+
+string DoublyLinkedListPriorityQueue::peek() {
+    if (isEmpty()) {
+        error("peek: Cannot peek from empty queue.");
+    }
+
+    Cell* node = head;
+    string smallest = head->value;
+
+    while (node != nullptr) {
+        if (node->value < smallest) {
+            smallest = node->value;
+        }
+        node = node->next;
+    }
+    return smallest;
+}
+
+string DoublyLinkedListPriorityQueue::dequeueMin() {
+    if (isEmpty()) {
+        error("dequeueMin: Queue is empty.");
+    }
+
+    string target = peek();
+    Cell* node = head;
+
+    while (node != nullptr && node->value != target) {
+        node = node->next;
+    }
+
+    if (node->prev == nullptr && node->next == nullptr) {
+        head = nullptr;
+    } else if (node->prev == nullptr) {
+        head = node->next;
+        head->prev = nullptr;
+    } else if (node->next == nullptr) {
+        node->prev->next = nullptr;
+    } else {
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+    }
+
+    delete node;
+    count -= 1;
+    return target;
+}

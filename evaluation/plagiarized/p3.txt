@@ -1,0 +1,52 @@
+#include <iostream>
+#include <fstream>
+#include <map>
+#include <set>
+#include <string>
+
+std::map<char, std::set<std::string>> parseCodonsFile(const std::string& filename);
+std::set<std::string> getRNAForProtein(const std::string& protein, std::map<char, std::set<std::string>>& codonTable);
+
+int main() {
+	auto codonTable = parseCodonsFile("codons.txt");
+
+	std::string proteinInput;
+	std::cout << "Protein: ";
+	std::getline(std::cin, proteinInput);
+
+	auto allStrands = getRNAForProtein(proteinInput, codonTable);
+
+	for (const auto& strand : allStrands) {
+		std::cout << strand << '\n';
+	}
+}
+
+std::map<char, std::set<std::string>> parseCodonsFile(const std::string& filename) {
+	std::ifstream file(filename);
+	std::map<char, std::set<std::string>> codons;
+	std::string codon;
+	char amino;
+
+	while (file >> codon >> amino) {
+		codons[amino].insert(codon);
+	}
+	return codons;
+}
+
+std::set<std::string> getRNAForProtein(const std::string& protein, std::map<char, std::set<std::string>>& codonTable) {
+	if (protein.empty()) return {};
+
+	if (protein.size() == 1) {
+		return codonTable[protein[0]];
+	}
+
+	std::set<std::string> result;
+	auto subResults = getRNAForProtein(protein.substr(1), codonTable);
+
+	for (const auto& codon : codonTable[protein[0]]) {
+		for (const auto& rest : subResults) {
+			result.insert(codon + rest);
+		}
+	}
+	return result;
+}

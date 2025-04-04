@@ -1,0 +1,58 @@
+#include <vector>
+#include <algorithm>
+
+class MinHeapQueue {
+    vector<string> items;
+    
+    int parent(int i) { return (i - 1) / 2; }
+    int leftChild(int i) { return 2 * i + 1; }
+    int rightChild(int i) { return 2 * i + 2; }
+
+    void percolateUp(int index) {
+        while (index > 0 && items[index] < items[parent(index)]) {
+            swap(items[index], items[parent(index)]);
+            index = parent(index);
+        }
+    }
+
+    void heapify(int index) {
+        int minIndex = index;
+        int left = leftChild(index);
+        int right = rightChild(index);
+        
+        if (left < items.size() && items[left] < items[minIndex])
+            minIndex = left;
+        if (right < items.size() && items[right] < items[minIndex])
+            minIndex = right;
+        
+        if (minIndex != index) {
+            swap(items[index], items[minIndex]);
+            heapify(minIndex);
+        }
+    }
+
+public:
+    MinHeapQueue() = default;
+
+    void push(const string& value) {
+        items.push_back(value);
+        percolateUp(items.size() - 1);
+    }
+
+    string top() {
+        if (items.empty()) error("Queue is empty");
+        return items.front();
+    }
+
+    string pop() {
+        if (items.empty()) error("Empty queue");
+        string val = top();
+        items[0] = items.back();
+        items.pop_back();
+        if (!items.empty()) heapify(0);
+        return val;
+    }
+
+    bool empty() const { return items.empty(); }
+    int size() const { return items.size(); }
+};

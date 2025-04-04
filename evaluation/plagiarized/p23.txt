@@ -1,0 +1,135 @@
+#include <iostream>
+#include <map>
+#include <queue>
+#include <vector>
+#include <string>
+
+struct HuffmanNode {
+    ext_char symbol;
+    int freq;
+    HuffmanNode *left, *right;
+    HuffmanNode(ext_char s, int f, HuffmanNode* l = nullptr, HuffmanNode* r = nullptr)
+        : symbol(s), freq(f), left(l), right(r) {}
+};
+
+std::map<ext_char, int> buildFrequencyMap(std::istream& input) {
+    std::map<ext_char, int> charFrequencies;
+    charFrequencies[PSEUDO_EOF] = 1;
+    char ch;
+    while (input.get(ch)) {
+        charFrequencies[ch]++;
+    }
+    return charFrequencies;
+}
+
+HuffmanNode* constructHuffmanTree(const std::map<ext_char, int>& charFrequencies) {
+    auto compare = [](HuffmanNode* a, HuffmanNode* b) { return a->freq > b->freq; };
+    std::priority_queue<HuffmanNode*, std::vector<HuffmanNode*>, decltype(compare)> pq(compare);
+    for (const auto& pair : charFrequencies) {
+        pq.push(new HuffmanNode(pair.first, pair.second));
+    }
+    while (pq.size() > 1) {
+        HuffmanNode* leftChild = pq.top(); pq.pop();
+        HuffmanNode* rightChild = pq.top(); pq.pop();
+        pq.push(new HuffmanNode(NOT_A_CHAR, leftChild->freq + rightChild->freq, leftChild, rightChild));
+    }
+    return pq.empty() ? nullptr : pq.top();
+}
+
+void releaseTree(HuffmanNode* root) {
+    if (!root) return;
+    releaseTree(root->left);
+    releaseTree(root->right);
+    delete root;
+}
+
+void performEncoding(std::istream& input, HuffmanNode* tree, obstream& output) {
+    std::map<ext_char, std::string> codeTable = createCodeMap(tree);
+    char ch;
+    while (input.get(ch)) {
+        outputBits(output, codeTable[ch]);
+    }
+    outputBits(output, codeTable[PSEUDO_EOF]);
+}
+
+std::map<ext_char, std::string> createCodeMap(HuffmanNode* root) {
+    std::map<ext_char, std::string> codes;
+    std::string currentCode;
+    collectCodes(root, codes, currentCode);
+    return codes;
+}
+
+void collectCodes(HuffmanNode* node, std::map<ext_char, std::string>& codes, std::string code) {
+    if (!node) return;
+    if (node->symbol != NOT_A_CHAR) {
+        codes[node->symbol] = code.empty() ? "0" : code;
+    }
+    collectCodes(node->left, codes, code + "0");
+    collectCodes(node->right, codes, code + "1");
+}
+
+void outputBits(obstream& output, const std::string& bits) {
+    for (char bit : bits) {
+        output.writeBit(bit == '1' ? 1 : 0);
+    }
+}
+
+void performDecoding(ibstream& input, HuffmanNode* tree, std::ostream& output) {
+    std::map<ext_char, std::string> codeMap = createCodeMap(tree);
+    std::map<std::string, ext_char> reverseMap;
+    for (const auto& pair : codeMap) {
+        reverseMap[pair.second] = pair.first;
+    }
+    std::string bitPattern;
+    int bit;
+    while ((bit = input.readBit()) != -1) {
+        bitPattern += bit ? "1" : "0";
+        if (reverseMap.count(bitPattern)) {
+            ext_char ch = reverseMap[bitPattern];
+            if (ch == PSEUDO_EOF) break;
+            output.put(static_cast<char>(ch));
+            bitPattern.clear();
+        }
+    }
+}
+
+void serializeHeader(obstream& output, const std::map<ext_char, int>& freq) {
+    output << freq.size() - 1 << ' ';
+    for (const auto& pair : freq) {
+        if (pair.first != PSEUDO_EOF) {
+            output << static_cast<char>(pair.first) << pair.second << ' ';
+        }
+    }
+}
+
+std::map<ext_char, int> deserializeHeader(ibstream& input) {
+    std::map<ext_char, int> freq;
+    int count;
+    input >> count;
+    input.get();
+    for (int i = 0; i < count; i++) {
+        ext_char ch = input.get();
+        int frequency;
+        input >> frequency;
+        input.get();
+        freq[ch] = frequency;
+    }
+    freq[PSEUDO_EOF] = 1;
+    return freq;
+}
+
+void huffmanCompress(ibstream& input, obstream& output) {
+    std::map<ext_char, int> freq = buildFrequencyMap(input);
+    input.rewind();
+    serializeHeader(output, freq);
+    HuffmanNode* tree = constructHuffmanTree(freq);
+    performEncoding(input, tree, output);
+    releaseTree(tree);
+}
+
+void huffmanDecompress(ibstream& input, std::ostream& output) {
+    std::map<ext_char, int> freq = deserializeHeader(input);
+    HuffmanNode* tree = constructHuffmanTree(freq);
+    performDecoding(input, tree, output);
+    releaseTree(tree);
+}

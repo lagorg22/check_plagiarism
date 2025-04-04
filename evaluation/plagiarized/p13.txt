@@ -1,0 +1,62 @@
+const Proyecto = require("../models/Proyecto");
+const { validationResult } = require("express-validator");
+
+exports.nuevo = async (req, res) => {
+	const errores = validationResult(req);
+	if (!errores.isEmpty()) return res.status(400).json({ errores: errores.array() });
+
+	try {
+		const nuevoProyecto = new Proyecto({ ...req.body, creador: req.usuario.id });
+		await nuevoProyecto.save();
+		res.json(nuevoProyecto);
+	} catch (e) {
+		console.error(e);
+		res.status(500).send("Error interno");
+	}
+};
+
+exports.todos = async (req, res) => {
+	try {
+		const proyectos = await Proyecto.find({ creador: req.usuario.id }).sort({ creado: -1 });
+		res.json({ proyectos });
+	} catch (e) {
+		console.error(e);
+		res.status(500).send("Fallo al obtener proyectos");
+	}
+};
+
+exports.editar = async (req, res) => {
+	const errores = validationResult(req);
+	if (!errores.isEmpty()) return res.status(400).json({ errores: errores.array() });
+
+	const datos = {};
+	if (req.body.nombre) datos.nombre = req.body.nombre;
+
+	try {
+		let proyecto = await Proyecto.findById(req.params.id);
+		if (!proyecto) return res.status(404).json({ msg: "No encontrado" });
+
+		if (proyecto.creador.toString() !== req.usuario.id)
+			return res.status(401).json({ msg: "Sin autorización" });
+
+		proyecto = await Proyecto.findByIdAndUpdate(req.params.id, { $set: datos }, { new: true });
+		res.json({ proyecto });
+	} catch (e) {
+		console.error(e);
+		res.status(500).send("Error actualizando proyecto");
+	}
+};
+
+exports.eliminar = async (req, res) => {
+	try {
+		const proyecto = await Proyecto.findById(req.params.id);
+		if (!proyecto) return res.status(404).json({ msg: "Proyecto no existe" });
+
+		if (proyecto.creador.toString() !== req.usuario.id)
+			return res.status(401).json({ msg: "No autorizado" });
+
+		await Proyecto.deleteOne({ _id: req.params.id });
+		res.json({ msg: "Eliminado correctamente" });
+	} catch (e) {
+		console.error(e);
+		res.status(500).send

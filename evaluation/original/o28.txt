@@ -1,0 +1,57 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class TextAnalyzer {
+
+    public static void main(String[] args) {
+        String inputFile = "input.txt";
+        String outputFile = "output.txt";
+        createDummyInputFile(inputFile);
+        analyzeText(inputFile, outputFile);
+    }
+
+    public static void createDummyInputFile(String filename) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
+            writer.write("This is a sample text file.\n");
+            writer.write("It contains multiple lines of text.\n");
+            writer.write("Some words appear more than once, like text and file.\n");
+            writer.write("Let's count the occurrences of each word.\n");
+            writer.write("This is the end of the sample text file.\n");
+        } catch (IOException e) {
+            System.err.println("Error creating dummy input file: " + e.getMessage());
+        }
+    }
+
+    public static void analyzeText(String inputFile, String outputFile) {
+        Map<String, Integer> wordCounts = new HashMap<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] words = line.toLowerCase().replaceAll("[^a-zA-Z\\s]", "").split("\\s+");
+                for (String word : words) {
+                    if (!word.isEmpty()) {
+                        wordCounts.put(word, wordCounts.getOrDefault(word, 0) + 1);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading input file: " + e.getMessage());
+            return;
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
+            writer.write("--- Word Count Analysis ---\n");
+            for (Map.Entry<String, Integer> entry : wordCounts.entrySet()) {
+                writer.write(entry.getKey() + ": " + entry.getValue() + "\n");
+            }
+            System.out.println("Word count analysis written to: " + outputFile);
+        } catch (IOException e) {
+            System.err.println("Error writing to output file: " + e.getMessage());
+        }
+    }
+}

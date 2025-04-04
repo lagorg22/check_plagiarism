@@ -1,0 +1,104 @@
+package tetris;
+
+import java.util.*;
+
+class Tetromino {
+    private TPoint[] shape;
+    private int[] baseProfile;
+    private int width;
+    private int height;
+    private Tetromino rotated;
+    
+    static private Tetromino[] prototypes;
+    
+    public Tetromino(TPoint[] points) {
+        shape = Arrays.copyOf(points, points.length);
+        Arrays.sort(shape);
+        int maxX = 0, maxY = 0;
+        for (TPoint p : shape) {
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+        }
+        width = maxX + 1;
+        height = maxY + 1;
+        
+        baseProfile = new int[width];
+        Arrays.fill(baseProfile, height);
+        for (TPoint p : shape) {
+            if (baseProfile[p.x] > p.y) {
+                baseProfile[p.x] = p.y;
+            }
+        }
+    }
+    
+    public Tetromino(String points) {
+        this(convertStringToPoints(points));
+    }
+    
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
+    public TPoint[] getShape() { return shape; }
+    public int[] getBaseProfile() { return baseProfile; }
+    
+    public Tetromino createRotated() {
+        TPoint[] rotated = new TPoint[shape.length];
+        for (int i = 0; i < shape.length; i++) {
+            rotated[i] = new TPoint(height - shape[i].y - 1, shape[i].x);
+        }
+        return new Tetromino(rotated);
+    }
+    
+    public Tetromino quickRotate() {
+        return rotated;
+    }
+    
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Tetromino)) return false;
+        return Arrays.equals(shape, ((Tetromino)o).shape);
+    }
+    
+    private static final String[] SHAPE_DEFS = {
+        "0 0 0 1 0 2 0 3",    // I
+        "0 0 0 1 0 2 1 0",     // L
+        "0 0 1 0 1 1 1 2",     // J
+        "0 0 1 0 1 1 2 1",     // S
+        "0 1 1 1 1 0 2 0",     // Z
+        "0 0 0 1 1 0 1 1",     // O
+        "0 0 1 0 1 1 2 0"      // T
+    };
+    
+    public static Tetromino[] getPrototypes() {
+        if (prototypes == null) {
+            prototypes = new Tetromino[SHAPE_DEFS.length];
+            for (int i = 0; i < SHAPE_DEFS.length; i++) {
+                prototypes[i] = generateRotationChain(new Tetromino(SHAPE_DEFS[i]));
+            }
+        }
+        return prototypes;
+    }
+    
+    private static Tetromino generateRotationChain(Tetromino base) {
+        Tetromino current = base;
+        Tetromino next = base.createRotated();
+        while (!base.equals(next)) {
+            current.rotated = next;
+            current = next;
+            next = next.createRotated();
+        }
+        current.rotated = base;
+        return base;
+    }
+    
+    private static TPoint[] convertStringToPoints(String s) {
+        List<TPoint> points = new ArrayList<>();
+        Scanner sc = new Scanner(s);
+        while (sc.hasNextInt()) {
+            int x = sc.nextInt();
+            int y = sc.nextInt();
+            points.add(new TPoint(x, y));
+        }
+        sc.close();
+        return points.toArray(new TPoint[0]);
+    }
+}

@@ -1,0 +1,60 @@
+from django.db import models
+from django.contrib.auth.models import User
+from products.models import Product
+from decimal import Decimal
+
+class CustomerOrder(models.Model):
+    """
+    Represents a user's order, including delivery and status information.
+    """
+    STATUSES = [
+        ('PENDING', 'Pending'),
+        ('PROCESSING', 'Processing'),
+        ('SENT', 'Sent'),
+        ('RECEIVED', 'Received'),
+        ('VOIDED', 'Voided'),
+    ]
+
+    account = models.ForeignKey(User, on_delete=models.CASCADE, related_name='customer_orders')
+    name = models.CharField(max_length=100)
+    delivery_address = models.TextField()
+    phone_number = models.CharField(max_length=20)
+    email_address = models.EmailField()
+    status = models.CharField(max_length=20, choices=STATUSES, default='PENDING')
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    date_created = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Order #{self.pk} - {self.account.username}"
+
+    def compute_total_price(self):
+        """
+        Aggregates and updates total_price based on related order items.
+        """
+        computed = sum([
+            line.unit_price * line.count
+            for line in self.order_lines.all()
+        ])
+        self.total_price = computed
+        self.save()
+        return computed
+
+    class Meta:
+        ordering = ['-date_created']
+
+
+class OrderLine(models.Model):
+    """
+    Each product and quantity within a CustomerOrder.
+    """
+    order = models.ForeignKey(CustomerOrder, on_delete=models.CASCADE, related_name='order_lines')
+    product_ref = models.ForeignKey(Product, on_delete=models.PROTECT)
+    count = models.PositiveIntegerField(default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.count} × {self.product_ref.name} (Order #{self.order.id})"
+
+    class Meta:
+        ordering = ['order', 'id']

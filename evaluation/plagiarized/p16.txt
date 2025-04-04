@@ -1,0 +1,36 @@
+from rest_framework import serializers
+from .models import Order, OrderItem
+from products.serializers import ProductSerializer
+
+# Serializer for a single item in the order
+class OrderItemPublicSerializer(serializers.ModelSerializer):
+    product_data = ProductSerializer(source='product', read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product', 'product_data', 'quantity', 'price']
+        extra_kwargs = {
+            'product': {'write_only': True}
+        }
+
+# Serializer to show full order including items
+class CustomerOrderSerializer(serializers.ModelSerializer):
+    items = OrderItemPublicSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'user', 'full_name', 'address', 'phone',
+            'email', 'status', 'total_amount', 'items',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['user', 'total_amount', 'created_at', 'updated_at']
+
+# Serializer for when a user submits a new order
+class OrderInputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['full_name', 'address', 'phone', 'email']
+
+    def create(self, validated_data):
+        return Order.objects.create(user=self.context['request'].user, **validated_data)

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Random JavaScript</title>
+</head>
+<body>
+  <div id="output"></div>
+  <button onclick="changeText()">Click Me</button>
+
+  <script>
+    function changeText() {
+      const outputDiv = document.getElementById("output");
+      const randomTexts = ["Hello!", "How are you?", "Have a nice day!", "JavaScript is fun!"];
+      const randomIndex = Math.floor(Math.random() * randomTexts.length);
+      outputDiv.textContent = randomTexts[randomIndex];
+      outputDiv.style.backgroundColor = getRandomColor();
+      outputDiv.style.padding = "10px";
+      outputDiv.style.borderRadius = "5px";
+    }
+
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+  </script>
+</body>
+</html>

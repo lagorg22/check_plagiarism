@@ -1,0 +1,21 @@
+import random
+
+def create_dummy_file(filename="temp.txt", num_lines=20):
+    with open(filename, 'w') as f:
+        for i in range(num_lines):
+            f.write(f"Line {i+1}: {random.randint(1, 100)}\n")
+
+def read_and_process_file(filename="temp.txt"):
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            print(f"Read {len(lines)} lines from {filename}")
+            for index, line in enumerate(lines):
+                if index % 2 == 0:
+                    print(f"Even Line {index // 2 + 1}: {line.strip().upper()}")
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
+
+if __name__ == "__main__":
+    create_dummy_file()
+    read_and_process_file()

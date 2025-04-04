@@ -1,0 +1,23 @@
+const numbers = [10, 5, 20, 15, 25, 30];
+console.log("Original Array:", numbers);
+
+const doubled = numbers.map(num => num * 2);
+console.log("Doubled Array:", doubled);
+
+const evenNumbers = numbers.filter(num => num % 2 === 0);
+console.log("Even Numbers:", evenNumbers);
+
+const sum = numbers.reduce((acc, curr) => acc + curr, 0);
+console.log("Sum of Array:", sum);
+
+const firstGreaterThan15 = numbers.find(num => num > 15);
+console.log("First Number Greater Than 15:", firstGreaterThan15);
+
+const sortedNumbers = [...numbers].sort((a, b) => a - b); // Create a copy to avoid modifying original
+console.log("Sorted Array:", sortedNumbers);
+
+const includesTwenty = numbers.includes(20);
+console.log("Includes 20:", includesTwenty);
+
+const stringified = numbers.map(num => String(num));
+console.log("Stringified Array:", stringified);

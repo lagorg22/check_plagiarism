@@ -1,0 +1,82 @@
+// Service worker management module
+// Restructured with inverted conditionals and different error handling
+
+const isDevEnvironment = () => {
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(host);
+};
+
+export function initServiceWorker(settings) {
+  const shouldRegister = process.env.NODE_ENV === 'production' 
+    && 'serviceWorker' in navigator;
+
+  if (!shouldRegister) return;
+
+  const originCheck = new URL(process.env.PUBLIC_URL, window.location.href).origin;
+  if (originCheck !== window.location.origin) return;
+
+  const swHandler = () => {
+    const swPath = process.env.PUBLIC_URL + '/service-worker.js';
+    
+    isDevEnvironment() 
+      ? validateWorker(swPath, settings)
+      : registerWorker(swPath, settings);
+  };
+
+  window.addEventListener('load', swHandler);
+}
+
+const registerWorker = (url, conf) => {
+  navigator.serviceWorker.register(url)
+    .then(reg => handleRegistration(reg, conf))
+    .catch(err => console.error('Registration error:', err));
+};
+
+const handleRegistration = (registration, config) => {
+  registration.onupdatefound = () => {
+    const worker = registration.installing || null;
+    worker?.addEventListener('statechange', () => {
+      if (worker.state !== 'installed') return;
+      
+      navigator.serviceWorker.controller
+        ? handleUpdate(config, registration)
+        : handleFirstInstall(config, registration);
+    });
+  };
+};
+
+const handleUpdate = (config, reg) => {
+  console.log('New version available. Will activate when tabs close.');
+  config?.onUpdate?.(reg);
+};
+
+const handleFirstInstall = (config, reg) => {
+  console.log('Assets cached for offline usage');
+  config?.onSuccess?.(reg);
+};
+
+const validateWorker = async (url, config) => {
+  try {
+    const response = await fetch(url, { headers: { 'ServiceWorker': '1' } });
+    const isValid = response.status !== 404 
+      && response.headers.get('content-type')?.includes('javascript');
+
+    isValid 
+      ? registerWorker(url, config)
+      : await refreshPage();
+  } catch {
+    console.log('Operating in offline environment');
+  }
+};
+
+const refreshPage = async () => {
+  const reg = await navigator.serviceWorker.ready;
+  await reg.unregister();
+  window.location.reload();
+};
+
+export const deregister = () => {
+  navigator.serviceWorker?.ready
+    .then(reg => reg.unregister())
+    .catch(e => console.log('Deregistration failed:', e));
+};

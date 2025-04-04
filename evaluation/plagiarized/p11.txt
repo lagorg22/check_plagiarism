@@ -1,0 +1,72 @@
+const Project = require("../models/Proyecto");
+const { validationResult } = require("express-validator");
+
+// Create a new project
+exports.addProject = async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		return res.status(400).json({ errors: errors.array() });
+	}
+
+	try {
+		const newProject = new Project(req.body);
+		newProject.creator = req.usuario.id;
+		await newProject.save();
+
+		res.json(newProject);
+	} catch (err) {
+		console.error(err);
+		res.status(500).send("Server error");
+	}
+};
+
+// Fetch all projects of current user
+exports.fetchProjects = async (req, res) => {
+	try {
+		const projectList = await Project.find({ creator: req.usuario.id }).sort({ createdAt: -1 });
+		res.json({ projects: projectList });
+	} catch (err) {
+		console.error(err);
+		res.status(500).send("Server error");
+	}
+};
+
+// Modify an existing project
+exports.updateProject = async (req, res) => {
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+	const updates = {};
+	if (req.body.nombre) updates.nombre = req.body.nombre;
+
+	try {
+		let existing = await Project.findById(req.params.id);
+		if (!existing) return res.status(404).json({ msg: "Project not found" });
+
+		if (existing.creator.toString() !== req.usuario.id)
+			return res.status(401).json({ msg: "Unauthorized" });
+
+		existing = await Project.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true });
+		res.json({ project: existing });
+	} catch (err) {
+		console.error(err);
+		res.status(500).send("Server error");
+	}
+};
+
+// Remove a project
+exports.removeProject = async (req, res) => {
+	try {
+		const target = await Project.findById(req.params.id);
+		if (!target) return res.status(404).json({ msg: "Project not found" });
+
+		if (target.creator.toString() !== req.usuario.id)
+			return res.status(401).json({ msg: "Unauthorized" });
+
+		await Project.deleteOne({ _id: req.params.id });
+		res.json({ msg: "Project removed" });
+	} catch (err) {
+		console.error(err);
+		res.status(500).send("Server error");
+	}
+};

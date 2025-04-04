@@ -1,0 +1,31 @@
+import java.util.Random;
+
+public class RandomNumberGenerator {
+    private Random random;
+
+    public RandomNumberGenerator() {
+        this.random = new Random();
+    }
+
+    public int nextInt(int bound) {
+        return random.nextInt(bound);
+    }
+
+    public double nextDouble() {
+        return random.nextDouble();
+    }
+
+    public boolean nextBoolean() {
+        return random.nextBoolean();
+    }
+
+    public static void main(String[] args) {
+        RandomNumberGenerator generator = new RandomNumberGenerator();
+        System.out.println("Random Integer (0-99): " + generator.nextInt(100));
+        System.out.println("Random Double (0.0-1.0): " + generator.nextDouble());
+        System.out.println("Random Boolean: " + generator.nextBoolean());
+        for (int i = 0; i < 5; i++) {
+            System.out.println("Another Random Integer (0-19): " + generator.nextInt(20));
+        }
+    }
+}

@@ -1,0 +1,71 @@
+const ProyectoModel = require("../models/Proyecto");
+const { validationResult } = require("express-validator");
+
+exports.create = async (req, res) => {
+	const result = validationResult(req);
+	if (!result.isEmpty()) {
+		return res.status(400).json({ errors: result.array() });
+	}
+
+	try {
+		const record = new ProyectoModel(req.body);
+		record.owner = req.usuario.id;
+		await record.save();
+		res.json(record);
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("Internal server error");
+	}
+};
+
+exports.listByUser = async (req, res) => {
+	try {
+		const items = await ProyectoModel.find({ owner: req.usuario.id }).sort({ creado: -1 });
+		res.json({ data: items });
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("Error retrieving projects");
+	}
+};
+
+exports.editProject = async (req, res) => {
+	const result = validationResult(req);
+	if (!result.isEmpty()) {
+		return res.status(400).json({ errors: result.array() });
+	}
+
+	const updatePayload = {};
+	if (req.body.nombre) updatePayload.nombre = req.body.nombre;
+
+	try {
+		let item = await ProyectoModel.findById(req.params.id);
+		if (!item) return res.status(404).json({ msg: "Not found" });
+
+		if (item.owner.toString() !== req.usuario.id) {
+			return res.status(403).json({ msg: "Permission denied" });
+		}
+
+		item = await ProyectoModel.findByIdAndUpdate(req.params.id, { $set: updatePayload }, { new: true });
+		res.json({ item });
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("Error updating item");
+	}
+};
+
+exports.deleteProject = async (req, res) => {
+	try {
+		const item = await ProyectoModel.findById(req.params.id);
+		if (!item) return res.status(404).json({ msg: "Not found" });
+
+		if (item.owner.toString() !== req.usuario.id) {
+			return res.status(403).json({ msg: "Permission denied" });
+		}
+
+		await ProyectoModel.findByIdAndRemove(req.params.id);
+		res.json({ msg: "Deleted successfully" });
+	} catch (err) {
+		console.log(err);
+		res.status(500).send("Error deleting project");
+	}
+};

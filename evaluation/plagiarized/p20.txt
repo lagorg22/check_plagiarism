@@ -1,0 +1,78 @@
+// Service worker initialization for progressive web apps
+// Modified implementation with async/await pattern
+
+const localEnvCheck = () => 
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '[::1]' ||
+  /^127(\.([25][0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(window.location.hostname);
+
+async function setupServiceWorker(params) {
+  if (process.env.NODE_ENV === 'production' && navigator.serviceWorker) {
+    const baseURL = new URL(process.env.PUBLIC_URL, window.location.href);
+    
+    if (baseURL.origin !== window.location.origin) return;
+
+    window.addEventListener('load', async () => {
+      const workerURL = `${process.env.PUBLIC_URL}/service-worker.js`;
+      
+      if (localEnvCheck()) {
+        await verifyServiceWorker(workerURL, params);
+        navigator.serviceWorker.ready.then(() => {
+          console.log('This app uses cached-first strategy via service worker. Learn more: https://bit.ly/PWA-Info');
+        });
+      } else {
+        await activateWorker(workerURL, params);
+      }
+    });
+  }
+}
+
+async function activateWorker(url, options) {
+  try {
+    const reg = await navigator.serviceWorker.register(url);
+    reg.onupdatefound = () => handleWorkerUpdate(reg, options);
+  } catch (err) {
+    console.error('Service worker activation failed:', err);
+  }
+}
+
+function handleWorkerUpdate(registration, config) {
+  const worker = registration.installing;
+  if (!worker) return;
+
+  worker.onstatechange = async () => {
+    if (worker.state === 'installed') {
+      if (navigator.serviceWorker.controller) {
+        console.log('Updated content available after tab closure. Details: https://bit.ly/PWA-Update');
+        config?.onUpdate?.(registration);
+      } else {
+        console.log('App resources cached for offline use');
+        config?.onSuccess?.(registration);
+      }
+    }
+  };
+}
+
+async function verifyServiceWorker(url, config) {
+  try {
+    const res = await fetch(url, { headers: { 'SW-Script': 'true' } });
+    const type = res.headers.get('content-type') || '';
+    
+    if (res.status === 404 || !type.includes('javascript')) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.unregister();
+      window.location.reload();
+    } else {
+      await activateWorker(url, config);
+    }
+  } catch {
+    console.log('Offline mode activated - no network connection');
+  }
+}
+
+export function removeWorker() {
+  navigator.serviceWorker?.ready.then(reg => reg.unregister())
+    .catch(e => console.error('Removal error:', e.message));
+}
+
+export { setupServiceWorker };

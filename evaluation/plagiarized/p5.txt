@@ -1,0 +1,59 @@
+from django.db import models
+from django.contrib.auth.models import User
+from products.models import Product
+from decimal import Decimal
+
+class Purchase(models.Model):
+    """
+    Stores each purchase made by users.
+    """
+    STATUS_OPTIONS = (
+        ('PENDING', 'Pending'),
+        ('IN_PROGRESS', 'In Progress'),
+        ('OUT_FOR_DELIVERY', 'Out for Delivery'),
+        ('DELIVERED', 'Delivered'),
+        ('CANCELLED', 'Cancelled'),
+    )
+
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchases')
+    recipient_name = models.CharField(max_length=100)
+    shipping_address = models.TextField()
+    contact_number = models.CharField(max_length=20)
+    contact_email = models.EmailField()
+    current_status = models.CharField(max_length=20, choices=STATUS_OPTIONS, default='PENDING')
+    grand_total = models.DecimalField(max_digits=10, decimal_places=2)
+    placed_on = models.DateTimeField(auto_now_add=True)
+    modified_on = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Purchase #{self.id} by {self.customer.username}"
+
+    def update_total(self):
+        """
+        Compute updated total based on items attached to this purchase
+        """
+        total = Decimal('0.00')
+        for detail in self.details.all():
+            total += detail.price * detail.amount
+        self.grand_total = total
+        self.save()
+        return total
+
+    class Meta:
+        ordering = ['-placed_on']
+
+
+class PurchaseItem(models.Model):
+    """
+    A single product entry within a Purchase.
+    """
+    purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name='details')
+    item = models.ForeignKey(Product, on_delete=models.PROTECT)
+    amount = models.PositiveIntegerField(default=1)
+    price = models.DecimalField(max_digits=10, decimal_places=2)  # Snapshot of price
+
+    def __str__(self):
+        return f"{self.amount} x {self.item.name} in Purchase #{self.purchase.id}"
+
+    class Meta:
+        ordering = ['purchase', 'id']

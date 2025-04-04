@@ -1,0 +1,57 @@
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <set>
+#include <map>
+
+std::map<char, std::set<std::string>> loadCodonDictionary();
+std::set<std::string> generateRNASequences(const std::string& protein, std::map<char, std::set<std::string>>& codonDict);
+
+int main() {
+	std::map<char, std::set<std::string>> codonDict = loadCodonDictionary();
+
+	std::string input;
+	std::cout << "Enter protein string: ";
+	std::getline(std::cin, input);
+
+	std::set<std::string> sequences = generateRNASequences(input, codonDict);
+
+	for (const auto& strand : sequences) {
+		std::cout << strand << std::endl;
+	}
+	return 0;
+}
+
+std::set<std::string> generateRNASequences(const std::string& protein, std::map<char, std::set<std::string>>& codonDict) {
+	std::set<std::string> results;
+
+	if (protein.length() == 1) {
+		for (const auto& codon : codonDict[protein[0]]) {
+			results.insert(codon);
+		}
+		return results;
+	}
+
+	std::string tail = protein.substr(1);
+	std::set<std::string> tails = generateRNASequences(tail, codonDict);
+
+	for (const std::string& prefix : codonDict[protein[0]]) {
+		for (const std::string& suffix : tails) {
+			results.insert(prefix + suffix);
+		}
+	}
+	return results;
+}
+
+std::map<char, std::set<std::string>> loadCodonDictionary() {
+	std::ifstream file("codons.txt");
+	std::map<char, std::set<std::string>> dictionary;
+
+	std::string codon;
+	char amino;
+
+	while (file >> codon >> amino) {
+		dictionary[amino].insert(codon);
+	}
+	return dictionary;
+}

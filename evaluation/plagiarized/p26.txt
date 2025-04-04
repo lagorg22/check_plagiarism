@@ -1,0 +1,100 @@
+package tetris;
+
+import java.util.*;
+import java.util.stream.*;
+
+class TetrominoFigure {
+    private final TPoint[] components;
+    private final int[] baseMap;
+    private final int width, height;
+    private TetrominoFigure nextState;
+    
+    private static TetrominoFigure[] figures;
+    
+    TetrominoFigure(TPoint[] points) {
+        components = Arrays.copyOf(points, points.length);
+        Arrays.sort(components);
+        
+        width = 1 + Arrays.stream(components)
+                 .mapToInt(p -> p.x)
+                 .max().orElse(0);
+        height = 1 + Arrays.stream(components)
+                  .mapToInt(p -> p.y)
+                  .max().orElse(0);
+        
+        baseMap = new int[width];
+        Arrays.fill(baseMap, height);
+        for (TPoint p : components) {
+            baseMap[p.x] = Math.min(baseMap[p.x], p.y);
+        }
+    }
+    
+    TetrominoFigure(String pattern) {
+        this(parsePattern(pattern));
+    }
+    
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
+    public TPoint[] getComponents() { return components; }
+    public int[] getBaseMap() { return baseMap; }
+    
+    public TetrominoFigure calculateRotation() {
+        return new TetrominoFigure(
+            Arrays.stream(components)
+                .map(p -> new TPoint(height - p.y - 1, p.x))
+                .toArray(TPoint[]::new)
+        );
+    }
+    
+    public TetrominoFigure getNextRotation() {
+        return nextState;
+    }
+    
+    public boolean equals(Object o) {
+        return o instanceof TetrominoFigure &&
+               Arrays.equals(components, ((TetrominoFigure)o).components);
+    }
+    
+    public static TetrominoFigure[] getBaseFigures() {
+        if (figures == null) {
+            List<String> patterns = List.of(
+                "0 0 0 1 0 2 0 3",
+                "0 0 0 1 0 2 1 0",
+                "0 0 1 0 1 1 1 2",
+                "0 0 1 0 1 1 2 1",
+                "0 1 1 1 1 0 2 0",
+                "0 0 0 1 1 0 1 1",
+                "0 0 1 0 1 1 2 0"
+            );
+            figures = patterns.stream()
+                .map(p -> generateRotationStates(new TetrominoFigure(p)))
+                .toArray(TetrominoFigure[]::new);
+        }
+        return figures;
+    }
+    
+    private static TetrominoFigure generateRotationStates(TetrominoFigure root) {
+        TetrominoFigure current = root;
+        while (true) {
+            TetrominoFigure next = current.calculateRotation();
+            if (next.equals(root)) {
+                current.nextState = root;
+                break;
+            }
+            current.nextState = next;
+            current = next;
+        }
+        return root;
+    }
+    
+    private static TPoint[] parsePattern(String pattern) {
+        int[] coords = Arrays.stream(pattern.split("\\s+"))
+            .mapToInt(Integer::parseInt)
+            .toArray();
+        TPoint[] points = new TPoint[coords.length / 2];
+        for (int i = 0; i < points.length; i++) {
+            points[i] = new TPoint(coords[2*i], coords[2*i+1]);
+        }
+        return points;
+    }
+}

@@ -1,0 +1,89 @@
+#include "pqueue-doublylinkedlist.h"
+#include "error.h"
+
+DoublyLinkedListPriorityQueue::DoublyLinkedListPriorityQueue() {
+    head = nullptr;
+    count = 0;
+}
+
+DoublyLinkedListPriorityQueue::~DoublyLinkedListPriorityQueue() {
+    // Delete each node one by one
+    while (head != nullptr) {
+        Cell* temp = head;
+        head = head->next;
+        delete temp;
+    }
+}
+
+int DoublyLinkedListPriorityQueue::size() {
+    return count;
+}
+
+bool DoublyLinkedListPriorityQueue::isEmpty() {
+    return count == 0;
+}
+
+void DoublyLinkedListPriorityQueue::enqueue(string val) {
+    Cell* node = new Cell;
+    node->value = val;
+    node->prev = nullptr;
+    node->next = head;
+
+    if (head != nullptr) {
+        head->prev = node;
+    }
+
+    head = node;
+    count++;
+}
+
+string DoublyLinkedListPriorityQueue::peek() {
+    if (isEmpty()) {
+        error("peek: Queue is empty");
+    }
+
+    string minimum = head->value;
+    Cell* cursor = head->next;
+
+    // Traverse and find the minimum string
+    while (cursor != nullptr) {
+        if (cursor->value < minimum) {
+            minimum = cursor->value;
+        }
+        cursor = cursor->next;
+    }
+
+    return minimum;
+}
+
+string DoublyLinkedListPriorityQueue::dequeueMin() {
+    if (isEmpty()) {
+        error("dequeueMin: Queue is empty");
+    }
+
+    string minVal = peek();
+    Cell* current = head;
+
+    // Locate the cell with the smallest value
+    while (current->value != minVal) {
+        current = current->next;
+    }
+
+    // Detach the cell
+    if (current->prev == nullptr && current->next == nullptr) {
+        head = nullptr;
+    } else if (current->prev == nullptr) {
+        head = current->next;
+        head->prev = nullptr;
+    } else if (current->next == nullptr) {
+        current->prev->next = nullptr;
+    } else {
+        current->prev->next = current->next;
+        current->next->prev = current->prev;
+    }
+
+    delete current;
+    count--;
+
+    return minVal;
+}

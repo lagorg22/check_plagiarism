@@ -1,0 +1,38 @@
+const express = require("express");
+const initializeDatabase = require("./config/db");
+const cors = require("cors");
+
+const app = express();
+
+// Conexión a la base de datos
+initializeDatabase();
+
+// Middleware para permitir CORS
+app.use(cors());
+
+// Middleware para analizar JSON en las solicitudes
+app.use(express.json({ extended: true }));
+
+// Definir puerto del servidor
+const PORT = process.env.PORT || 4000;
+
+// Rutas de la API
+const userRoutes = require("./routes/usuarios.js");
+const authRoutes = require("./routes/auth.js");
+const projectRoutes = require("./routes/proyectos.js");
+const taskRoutes = require("./routes/tareas.js");
+
+app.use("/api/usuarios", userRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/proyectos", projectRoutes);
+app.use("/api/tareas", taskRoutes);
+
+// Ruta de prueba
+app.get("/", (req, res) => {
+	res.send("Bienvenido al servidor");
+});
+
+// Iniciar servidor
+app.listen(PORT, "0.0.0.0", () => {
+	console.log(`Servidor escuchando en el puerto ${PORT}`);
+});

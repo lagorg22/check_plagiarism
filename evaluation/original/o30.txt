@@ -1,0 +1,58 @@
+import argparse
+import sys
+import os
+import datetime
+
+def create_file(filename):
+    try:
+        with open(filename, 'w') as f:
+            f.write(f"This file was created at: {datetime.datetime.now()}\n")
+        print(f"File '{filename}' created successfully.")
+    except Exception as e:
+        print(f"Error creating file '{filename}': {e}")
+
+def delete_file(filename):
+    if os.path.exists(filename):
+        try:
+            os.remove(filename)
+            print(f"File '{filename}' deleted successfully.")
+        except Exception as e:
+            print(f"Error deleting file '{filename}': {e}")
+    else:
+        print(f"File '{filename}' does not exist.")
+
+def list_files(directory="."):
+    try:
+        files = os.listdir(directory)
+        print(f"Files in directory '{directory}':")
+        for f in files:
+            print(f"- {f}")
+    except FileNotFoundError:
+        print(f"Error: Directory '{directory}' not found.")
+    except Exception as e:
+        print(f"Error listing files in '{directory}': {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Simple file management tool.")
+    parser.add_argument("action", choices=['create', 'delete', 'list'], help="Action to perform")
+    parser.add_argument("filename", nargs='?', help="Filename to create or delete")
+    parser.add_argument("-d", "--directory", help="Directory to list (for 'list' action)", default=".")
+
+    args = parser.parse_args()
+
+    if args.action == 'create':
+        if args.filename:
+            create_file(args.filename)
+        else:
+            print("Error: Filename is required for 'create' action.")
+            parser.print_help()
+            sys.exit(1)
+    elif args.action == 'delete':
+        if args.filename:
+            delete_file(args.filename)
+        else:
+            print("Error: Filename is required for 'delete' action.")
+            parser.print_help()
+            sys.exit(1)
+    elif args.action == 'list':
+        list_files(args.directory)

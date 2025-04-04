@@ -1,0 +1,83 @@
+// File: priority_queue_linked.cpp
+
+#include "error.h"
+#include "priority_queue_linked.h"
+
+LinkedPriorityQueue::LinkedPriorityQueue() {
+    front = nullptr;
+    length = 0;
+}
+
+LinkedPriorityQueue::~LinkedPriorityQueue() {
+    Node* cursor = front;
+    while (cursor != nullptr) {
+        Node* toDelete = cursor;
+        cursor = cursor->next;
+        delete toDelete;
+    }
+}
+
+int LinkedPriorityQueue::size() const {
+    return length;
+}
+
+bool LinkedPriorityQueue::isEmpty() const {
+    return length == 0;
+}
+
+void LinkedPriorityQueue::enqueue(const std::string& entry) {
+    Node* newNode = new Node{entry, nullptr, nullptr};
+
+    if (front == nullptr) {
+        front = newNode;
+    } else {
+        newNode->next = front;
+        front->prev = newNode;
+        front = newNode;
+    }
+
+    ++length;
+}
+
+std::string LinkedPriorityQueue::peek() const {
+    if (isEmpty()) error("peek: Queue is empty");
+
+    Node* cursor = front;
+    std::string minimum = cursor->data;
+
+    while (cursor != nullptr) {
+        if (cursor->data < minimum) {
+            minimum = cursor->data;
+        }
+        cursor = cursor->next;
+    }
+
+    return minimum;
+}
+
+std::string LinkedPriorityQueue::dequeueMin() {
+    if (isEmpty()) error("dequeueMin: Queue is empty");
+
+    std::string minStr = peek();
+    Node* cursor = front;
+
+    while (cursor->data != minStr) {
+        cursor = cursor->next;
+    }
+
+    if (cursor->prev == nullptr && cursor->next == nullptr) {
+        front = nullptr;
+    } else if (cursor->prev == nullptr) {
+        front = cursor->next;
+        front->prev = nullptr;
+    } else if (cursor->next == nullptr) {
+        cursor->prev->next = nullptr;
+    } else {
+        cursor->prev->next = cursor->next;
+        cursor->next->prev = cursor->prev;
+    }
+
+    delete cursor;
+    --length;
+    return minStr;
+}
