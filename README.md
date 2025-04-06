@@ -49,7 +49,7 @@ The system consists of several microservices that work together to detect code p
 
 2. Run the setup script:
    ```
-   (if you want to test with another repositories change them in setup.sh)
+   #if you want to test with another repositories change them in setup.sh and process_codefiles
    chmod +x setup.sh
    ./setup.sh
    ```
